@@ -31,11 +31,33 @@ type(
 		AsSlice()[]string
 	}
 
+
+	LineBreakMode = byte
+
 	GStringList struct{
 		strings 	[]string
-		LineBreak	string
+		LineBreak	LineBreakMode
 	}
 )
+
+const (
+	LBK_CRLF  LineBreakMode = iota
+	LBK_CR
+	LBK_LF
+)
+
+func (lst *GStringList)LineBreakStr()string  {
+	switch lst.LineBreak {
+	case LBK_CRLF:
+		return "\r\n"
+	case LBK_CR:
+		return "\r"
+	case LBK_LF:
+		return "\n"
+	default:
+		return "\r\n"
+	}
+}
 
 func (lst *GStringList) Count()int {
 	if lst.strings == nil{
@@ -65,11 +87,11 @@ func (lst *GStringList)Text()string{
 	if lst.Count()==0{
 		return ""
 	}
-	return  strings.Join(lst.strings,lst.LineBreak)
+	return  strings.Join(lst.strings,lst.LineBreakStr())
 }
 
 func (lst *GStringList)SetText(text string){
-	lst.strings = strings.Split(text,lst.LineBreak)
+	lst.strings = strings.Split(text,lst.LineBreakStr())
 }
 
 func (lst *GStringList)LoadFromFile(fileName string){
@@ -87,7 +109,7 @@ func (lst *GStringList)LoadFromFile(fileName string){
 					databytes = tmpbytes
 				}
 			}
-			lst.strings = strings.Split(FastByte2String(databytes),lst.LineBreak)
+			lst.strings = strings.Split(FastByte2String(databytes),lst.LineBreakStr())
 		}
 	}
 }
