@@ -1,5 +1,7 @@
 /*
 公用包
+Autor: 不得闲
+QQ:75492895
  */
 package DxCommonLib
 
@@ -39,13 +41,10 @@ func GBK2Utf8(gbk []byte)([]byte,error){
 	return d,nil
 }
 
-func FastString2Byte(str string)(result []byte)  {
-	pstring := (*reflect.StringHeader)(unsafe.Pointer(&str))
-	presult := (*reflect.SliceHeader)(unsafe.Pointer(&result))
-	presult.Data = pstring.Data
-	presult.Len = pstring.Len
-	presult.Cap = pstring.Len + 10
-	return
+
+//本函数只作为强制转换使用，不可将返回的Slice再做修改处理
+func FastString2Byte(str string)[]byte  {
+	return *(*[]byte)(unsafe.Pointer(&str))
 }
 
 func FastByte2String(bt []byte)string  {

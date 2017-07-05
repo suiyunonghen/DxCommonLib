@@ -1,3 +1,10 @@
+/*
+仿Delphi的通用类库
+GStringList类似于TStringList
+Autor: 不得闲
+QQ:75492895
+ */
+package
 package DxCommonLib
 
 import (
