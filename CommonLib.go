@@ -35,8 +35,9 @@ type(
 	LineBreakMode = byte
 
 	GStringList struct{
-		strings 	[]string
-		LineBreak	LineBreakMode
+		strings 				[]string
+		LineBreak				LineBreakMode
+		UnknownCodeUseGbk		bool		//未知编码的时候采用GBK编码打开
 	}
 )
 
@@ -104,7 +105,7 @@ func (lst *GStringList)LoadFromFile(fileName string){
 				databytes = databytes[3:]
 			}
 			file.Close()
-			if !isUtf8{
+			if !isUtf8 && lst.UnknownCodeUseGbk{
 				if tmpbytes,err := GBK2Utf8(databytes);err == nil{
 					databytes = tmpbytes
 				}
