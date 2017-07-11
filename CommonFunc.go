@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"unsafe"
-	"reflect"
 )
 
 func Ord(b bool)byte  {

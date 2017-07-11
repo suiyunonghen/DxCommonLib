@@ -4,7 +4,6 @@ GStringList类似于TStringList
 Autor: 不得闲
 QQ:75492895
  */
-package
 package DxCommonLib
 
 import (
@@ -39,7 +38,7 @@ type(
 	}
 
 
-	LineBreakMode = byte
+	LineBreakMode  byte
 
 	GStringList struct{
 		strings 				[]string
