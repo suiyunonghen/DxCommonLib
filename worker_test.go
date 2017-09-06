@@ -14,7 +14,7 @@ func worktest(data ...interface{}) {
 }
 
 func TestWorker(t *testing.T) {
-	work := NewWorkers(1, 30)
+	work := NewWorkers(100, 0)
 	for i := 0; i <= 10; i++ {
 		work.PostFunc(worktest, 3, 4)
 		work.PostFunc(worktest, 3, 4, 6, 786, 867)
@@ -22,5 +22,5 @@ func TestWorker(t *testing.T) {
 	}
 	<-After(time.Second * 12)
 	fmt.Println("准备关闭")
-	work.Stop(true)
+	work.Stop()
 }

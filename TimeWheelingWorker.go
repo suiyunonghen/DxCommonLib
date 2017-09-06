@@ -8,6 +8,7 @@ package DxCommonLib
 import (
 	"sync"
 	"time"
+	"sync/atomic"
 )
 
 type (
@@ -20,20 +21,23 @@ type (
 		quitchan   chan struct{}
 		curindex   int //当前的索引
 		interval   time.Duration
+		tkfunc		func()
 	}
 )
 
 var (
 	defaultTimeWheelWorker *TimeWheelWorker
+    coarseTime 				atomic.Value		//存放的是当前的实际时间
 )
 
 //interval指定调度的时间间隔
 //slotBlockCount指定时间轮的块长度
-func NewTimeWheelWorker(interval time.Duration, slotBlockCount int) *TimeWheelWorker {
+func NewTimeWheelWorker(interval time.Duration, slotBlockCount int,tkfunc func()) *TimeWheelWorker {
 	result := new(TimeWheelWorker)
 	result.interval = interval
 	result.quitchan = make(chan struct{})
 	result.slockcount = slotBlockCount
+	result.tkfunc = tkfunc
 	result.maxTimeout = interval * time.Duration(slotBlockCount)
 	result.timeslocks = make([]chan struct{}, slotBlockCount)
 	result.ticker = time.NewTicker(interval)
@@ -54,6 +58,9 @@ func (worker *TimeWheelWorker) run() {
 			worker.Unlock()
 			if lastC != nil {
 				close(lastC)
+			}
+			if worker.tkfunc!=nil{
+				worker.tkfunc()
 			}
 		case <-worker.quitchan:
 			worker.ticker.Stop()
@@ -90,15 +97,24 @@ func (worker *TimeWheelWorker) Sleep(d time.Duration) {
 }
 
 func After(d time.Duration) <-chan struct{} {
-	if defaultTimeWheelWorker == nil {
-		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200)
-	}
 	return defaultTimeWheelWorker.After(d)
 }
 
 func Sleep(d time.Duration) {
-	if defaultTimeWheelWorker == nil {
-		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200)
-	}
 	defaultTimeWheelWorker.Sleep(d)
 }
+
+func init()  {
+	defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200, func() {
+		t := time.Now().Truncate(time.Millisecond*500)
+		coarseTime.Store(&t)
+	})
+	t := time.Now().Truncate(time.Millisecond*500)
+	coarseTime.Store(&t)
+}
+
+func CoarseTimeNow() time.Time {
+	tp := coarseTime.Load().(*time.Time)
+	return *tp
+}
+
