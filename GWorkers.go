@@ -196,9 +196,9 @@ func (workers *GWorkers) workerFunc(ch *workerChan) {
 		}
 		curTask.Run() //执行
 		//回收curtask
-		switch curTask.(type) {
+		switch runner := curTask.(type) {
 		case *defTaskRunner:
-			workers.deftaskrunnerPool.Put(curTask)
+			workers.deftaskrunnerPool.Put(runner)
 		}
 		if !workers.release(ch) {
 			break
