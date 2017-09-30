@@ -11,7 +11,51 @@ import (
 	"bytes"
 	"io/ioutil"
 	"unsafe"
+	"time"
 )
+
+type(
+	TDateTime  float64
+)
+
+const (
+	MinsPerHour = 60
+	MinsPerDay = 24 * MinsPerHour
+	SecsPerDay = MinsPerDay * 60
+	MSecsPerDay = SecsPerDay * 1000
+)
+var delphiFirstTime time.Time
+
+func init() {
+	delphiFirstTime = time.Date(1899,12,30,0,0,0,0,time.Local)
+}
+
+
+/*
+从Delphi日期转为Go日期格式
+Delphi的日期规则为到1899-12-30号的天数+当前的毫秒数/一天的总共毫秒数集合
+ */
+func (date TDateTime)ToTime()time.Time  {
+	mDay := time.Duration(date)
+	ms := (date - TDateTime(mDay)) * TDateTime(MSecsPerDay)
+	return delphiFirstTime.Add(mDay*time.Hour*24 + time.Duration(ms)*time.Millisecond)
+}
+
+func (date *TDateTime)WrapTime2Self(t time.Time)  {
+	days := t.Sub(delphiFirstTime) / (time.Hour * 24)
+	y,m,d := t.Date()
+	nowdate := time.Date(y,m,d,0,0,0,0,time.Local)
+	times := float64(t.Sub(nowdate))/float64(time.Hour*24)
+	*date = TDateTime(float64(days) + times)
+}
+
+func Time2DelphiTime(t time.Time)TDateTime  {
+	days := t.Sub(delphiFirstTime) / (time.Hour * 24)
+	y,m,d := t.Date()
+	nowdate := time.Date(y,m,d,0,0,0,0,time.Local)
+	times := float64(t.Sub(nowdate))/float64(time.Hour*24)
+	return TDateTime(float64(days) + times)
+}
 
 func Ord(b bool)byte  {
 	if b{
@@ -49,3 +93,4 @@ func FastString2Byte(str string)[]byte  {
 func FastByte2String(bt []byte)string  {
 	return *(*string)(unsafe.Pointer(&bt))
 }
+

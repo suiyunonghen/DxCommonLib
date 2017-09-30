@@ -252,7 +252,7 @@ func PostFunc(routineFunc GWorkerFunc,params ...interface{})  {
 	if defWorkers == nil{
 		defWorkers = NewWorkers(0,0)
 	}
-	defWorkers.PostFunc(routineFunc,params)
+	defWorkers.PostFunc(routineFunc,params...)
 }
 
 func Post(runner ITaskRunner)  {
