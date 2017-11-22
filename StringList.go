@@ -191,7 +191,7 @@ func (lst *GStringList) AddPair(Name, Value string) {
 func (lst *GStringList) IndexOfName(Name string) int {
 	if lst.Count() > 0 {
 		for idx, v := range lst.strings {
-			if eidx := strings.IndexByte(v, '='); idx > 0 {
+			if eidx := strings.IndexByte(v, '='); eidx > 0 {
 				bt := []byte(v)
 				if string(bt[:eidx]) == Name {
 					return idx
