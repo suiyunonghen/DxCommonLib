@@ -12,6 +12,8 @@ import (
 	"io/ioutil"
 	"unsafe"
 	"time"
+	"unicode/utf16"
+	"reflect"
 )
 
 type(
@@ -84,6 +86,85 @@ func GBK2Utf8(gbk []byte)([]byte,error){
 	return d,nil
 }
 
+func PcharLen(dstr uintptr)int  {
+	if dstr == 0{
+		return 0
+	}
+	ptr := unsafe.Pointer(dstr)
+	for i := 0; ; i++ {
+		if 0 == *(*uint16)(ptr) {
+			return int(i)
+		}
+		ptr = unsafe.Pointer(uintptr(ptr) + 2)
+	}
+	return 0
+}
+
+func DelphiPcharLen(dstr uintptr)(result int32)  {
+	//Delphi字符串的地址的-4地址位置为长度
+	if dstr == 0{
+		return 0
+	}
+	result = *(*int32)(unsafe.Pointer(dstr - 4))
+	return
+}
+
+//将常规的pchar返回到string
+func Pchar2String(pcharstr uintptr)string  {
+	if pcharstr == 0{
+		return ""
+	}
+	ptr := unsafe.Pointer(pcharstr)
+	gbt := make([]uint16,0,255)
+	for i := 0; ; i++ {
+		if 0 == *(*uint16)(ptr) {
+			break
+		}
+		gbt = append(gbt,*(*uint16)(ptr))
+		ptr = unsafe.Pointer(uintptr(ptr) + 2)
+	}
+	return string(utf16.Decode(gbt))
+}
+
+//快速转换，不修改的
+func FastPchar2String(pcharstr uintptr)string  {
+	if pcharstr==0{
+		return ""
+	}
+	s := new(reflect.SliceHeader)
+	s.Data = pcharstr
+	s.Len = PcharLen(pcharstr)
+	s.Cap = s.Len
+	return string(utf16.Decode(*(*[] uint16)(unsafe.Pointer(s))))
+}
+
+//将Delphi的Pchar转换到string,Unicode
+func DelphiPchar2String(dstr uintptr)string  {
+	if dstr == 0{
+		return ""
+	}
+	ptr := unsafe.Pointer(dstr)
+	gbt := make([]uint16,DelphiPcharLen(dstr))
+	for i := 0; ; i++ {
+		if 0 == *(*uint16)(ptr) {
+			break
+		}
+		gbt[i] = *(*uint16)(ptr)
+		ptr = unsafe.Pointer(uintptr(ptr) + 2)
+	}
+	return string(utf16.Decode(gbt))
+}
+
+func FastDelphiPchar2String(pcharstr uintptr)string  {
+	if pcharstr==0{
+		return ""
+	}
+	s := new(reflect.SliceHeader)
+	s.Data = pcharstr
+	s.Len = int(DelphiPcharLen(pcharstr)*2)
+	s.Cap = s.Len
+	return string(utf16.Decode(*(*[] uint16)(unsafe.Pointer(s))))
+}
 
 //本函数只作为强制转换使用，不可将返回的Slice再做修改处理
 func FastString2Byte(str string)[]byte  {
