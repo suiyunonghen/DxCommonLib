@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"unsafe"
+	"os"
 	"time"
 	"unicode/utf16"
 	"reflect"
@@ -126,7 +127,7 @@ func Pchar2String(pcharstr uintptr)string  {
 	return string(utf16.Decode(gbt))
 }
 
-//快速转换，不修改的
+
 func FastPchar2String(pcharstr uintptr)string  {
 	if pcharstr==0{
 		return ""
@@ -175,3 +176,82 @@ func FastByte2String(bt []byte)string  {
 	return *(*string)(unsafe.Pointer(&bt))
 }
 
+//将drwxrwx这些转化为 FileMode
+func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
+	result = os.ModePerm
+	filemodebytes := []byte(permStr)
+	bytelen := len(filemodebytes)
+	istart := 0
+	if len(permStr) > 9 || filemodebytes[0]=='d' || filemodebytes[0]=='l' || filemodebytes[0]=='p'{
+		istart = 1
+	}
+	if bytelen > istart && filemodebytes[istart] == 'r'{
+		result = result | 0400
+	}else{
+		result = result & 0377
+	}
+	istart+=1
+	if bytelen > istart && filemodebytes[istart] == 'w'{
+		result = result | 0200
+	}else{
+		result = result & 0577
+	}
+	istart+=1
+
+	if bytelen > istart && filemodebytes[istart] == 'x'{
+		result = result | 0100
+	}else{
+		result = result & 0677
+	}
+	istart+=1
+
+	if bytelen > istart && filemodebytes[istart] == 'r'{
+		result = result | 0040
+	}else{
+		result = result & 0737
+	}
+	istart+=1
+
+	if bytelen > istart && filemodebytes[istart] == 'w'{
+		result = result | 0020
+	}else{
+		result = result & 0757
+	}
+	istart+=1
+
+	if bytelen > istart && filemodebytes[istart] == 'x'{
+		result = result | 0010
+	}else{
+		result = result & 0767
+	}
+	istart+=1
+
+
+	if bytelen > istart && filemodebytes[istart] == 'r'{
+		result = result | 0004
+	}else{
+		result = result & 0773
+	}
+	istart+=1
+
+	if bytelen > istart && filemodebytes[istart] == 'w'{
+		result = result | 0002
+	}else{
+		result = result & 0775
+	}
+	istart+=1
+
+	if bytelen > istart && filemodebytes[istart] == 'x'{
+		result = result | 0001
+	}else{
+		result = result & 0776
+	}
+
+
+	switch filemodebytes[0] {
+	case 'd': result = result | os.ModeDir
+	case 'l': result = result | os.ModeSymlink
+	case 'p': result = result | os.ModeNamedPipe
+	}
+	return
+}
