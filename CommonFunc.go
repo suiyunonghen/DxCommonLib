@@ -255,3 +255,33 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	}
 	return
 }
+
+
+
+//2进制转到16进制
+func Binary2Hex(bt []byte)string  {
+	var bf bytes.Buffer
+	vhex := [16]byte{'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'}
+	for _,vb := range bt{
+		bf.WriteByte(vhex[vb >> 4])
+		bf.WriteByte(vhex[vb & 0xF])
+	}
+	return string(bf.Bytes())
+}
+
+//16进制到2进制
+func Hex2Binary(hexStr string)[]byte  {
+	if hexStr == ""{
+		return nil
+	}
+	vhex := [71]byte{'0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'A':10,'B':11,'C':12,'D':13,'E':14,'F':15}
+	btlen := len(hexStr) / 2
+	result := make([]byte,btlen)
+	btlen = btlen << 1
+	jidx := 0
+	for i := 0;i<btlen;i += 2{
+		result[jidx] = vhex[hexStr[i]] << 4 | vhex[hexStr[i+1]]
+		jidx++
+	}
+	return result
+}
