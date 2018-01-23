@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf16"
 	"reflect"
+	"runtime"
 )
 
 type(
@@ -27,7 +28,10 @@ const (
 	SecsPerDay = MinsPerDay * 60
 	MSecsPerDay = SecsPerDay * 1000
 )
-var delphiFirstTime time.Time
+var (
+	delphiFirstTime time.Time
+	IsAmd64 = runtime.GOARCH == "amd64"
+)
 
 func init() {
 	delphiFirstTime = time.Date(1899,12,30,0,0,0,0,time.Local)
