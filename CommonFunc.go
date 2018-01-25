@@ -263,6 +263,7 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	return
 }
 
+//解码转义字符，将"\u6821\u56ed\u7f51\t02得闲"这类字符串，解码成正常显示的字符串
 func ParserEscapeStr(bvalue []byte)string {
 	blen := len(bvalue)
 	i := 0
@@ -298,6 +299,10 @@ func ParserEscapeStr(bvalue []byte)string {
 				buf.WriteByte('\n')
 			case '\\':
 				buf.WriteByte('\\')
+			case '"':
+				buf.WriteByte('"')
+			case 'b':
+				buf.WriteByte('\b')
 			case '\'':
 				buf.WriteByte('\'')
 			case 'u':
