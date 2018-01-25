@@ -13,6 +13,7 @@ import (
 	"unsafe"
 	"os"
 	"time"
+	"strconv"
 	"unicode/utf16"
 	"reflect"
 	"runtime"
@@ -262,6 +263,70 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	return
 }
 
+func ParserEscapeStr(bvalue []byte)string {
+	blen := len(bvalue)
+	i := 0
+	IsInUnicode := false
+	unicodeidx := 0
+	escapein := false
+	var buf bytes.Buffer
+	for i < blen{
+		if IsInUnicode{
+			escapein = false
+			if bvalue[i]>='0' && bvalue[i] <= '9' ||
+			   bvalue[i] >'a' && bvalue[i] <= 'f' || bvalue[i] >'A' && bvalue[i] <= 'F'{
+			}else{
+				unicodestr := FastByte2String(bvalue[unicodeidx+1:i])
+				if arune,err := strconv.ParseInt(unicodestr,16,32);err==nil{
+					buf.WriteRune(rune(arune))
+				}else{
+					buf.Write(bvalue[unicodeidx:i])
+				}
+				IsInUnicode = false
+				continue
+			}
+		}else if escapein {
+			escapein = false
+			switch bvalue[i] {
+			case 't':
+				buf.WriteByte('\t')
+			case 'f':
+				buf.WriteByte('\f')
+			case 'r':
+				buf.WriteByte('\r')
+			case 'n':
+				buf.WriteByte('\n')
+			case '\\':
+				buf.WriteByte('\\')
+			case '\'':
+				buf.WriteByte('\'')
+			case 'u':
+				IsInUnicode = true
+				unicodeidx = i
+			default:
+				buf.WriteByte('\\')
+				buf.WriteByte(bvalue[i])
+			}
+		}else if bvalue[i] == '\\'{
+			escapein = true
+			IsInUnicode = false
+		}else{
+			buf.WriteByte(bvalue[i])
+		}
+		i++
+	}
+	if IsInUnicode{
+		unicodestr := FastByte2String(bvalue[unicodeidx+1:i])
+		if arune,err := strconv.ParseInt(unicodestr,16,32);err==nil{
+			buf.WriteRune(rune(arune))
+		}else{
+			buf.Write(bvalue[unicodeidx:i])
+		}
+	}else if escapein{
+		buf.WriteByte('\\')
+	}
+	return FastByte2String(buf.Bytes())
+}
 
 
 //2进制转到16进制
