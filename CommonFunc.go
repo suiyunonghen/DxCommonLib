@@ -263,31 +263,20 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	return
 }
 
-//解码转义字符，将"\u6821\u56ed\u7f51\t02得闲"这类字符串，解码成正常显示的字符串
+
+//解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
 func ParserEscapeStr(bvalue []byte)string {
 	blen := len(bvalue)
 	i := 0
-	IsInUnicode := false
+	//IsInUnicode := false
 	unicodeidx := 0
-	escapein := false
+	//escapein := false
+	escapeType := uint8(0)  //0 normal,1 json\escapin,2 unicode escape, 3 % url escape
 	var buf bytes.Buffer
 	for i < blen{
-		if IsInUnicode{
-			escapein = false
-			if bvalue[i]>='0' && bvalue[i] <= '9' ||
-			   bvalue[i] >'a' && bvalue[i] <= 'f' || bvalue[i] >'A' && bvalue[i] <= 'F'{
-			}else{
-				unicodestr := FastByte2String(bvalue[unicodeidx+1:i])
-				if arune,err := strconv.ParseInt(unicodestr,16,32);err==nil{
-					buf.WriteRune(rune(arune))
-				}else{
-					buf.Write(bvalue[unicodeidx:i])
-				}
-				IsInUnicode = false
-				continue
-			}
-		}else if escapein {
-			escapein = false
+		switch escapeType {
+		case 1://json escapin
+			escapeType = 0
 			switch bvalue[i] {
 			case 't':
 				buf.WriteByte('\t')
@@ -306,29 +295,67 @@ func ParserEscapeStr(bvalue []byte)string {
 			case '\'':
 				buf.WriteByte('\'')
 			case 'u':
-				IsInUnicode = true
+				escapeType = 2 // unicode decode
 				unicodeidx = i
 			default:
 				buf.WriteByte('\\')
 				buf.WriteByte(bvalue[i])
 			}
-		}else if bvalue[i] == '\\'{
-			escapein = true
-			IsInUnicode = false
-		}else{
-			buf.WriteByte(bvalue[i])
+		case 2: //unicode decode
+			if (bvalue[i]>='0' && bvalue[i] <= '9' || bvalue[i] >'a' && bvalue[i] <= 'f' ||
+				bvalue[i] >'A' && bvalue[i] <= 'F') && i - unicodeidx <= 4{
+				//还是正常的Unicode字符，4个字符为一组
+				//escapeType = 2
+			}else{
+				unicodestr := FastByte2String(bvalue[unicodeidx+1:i])
+				if arune,err := strconv.ParseInt(unicodestr,16,32);err==nil{
+					buf.WriteRune(rune(arune))
+				}else{
+					buf.Write(bvalue[unicodeidx:i])
+				}
+				escapeType = 0
+				continue
+			}
+		case 3: //url escape
+			for j := 0;j<3;j++{
+				if (bvalue[j+i]>='0' && bvalue[j+i] <= '9' || bvalue[i+j] >'a' && bvalue[i+j] <= 'f' ||
+					bvalue[j+i] >'A' && bvalue[j+i] <= 'F') && j<2{
+					//还是正常的Byte字符，2个字符为一组
+					//escapeType = 2
+				}else{
+					bytestr := FastByte2String(bvalue[i:i+j])
+					if abyte,err := strconv.ParseInt(bytestr,16,32);err==nil{
+						buf.WriteByte(byte(abyte))
+					}else{
+						buf.Write(bvalue[i:i+j])
+					}
+					escapeType = 0
+					i += j - 1
+					break
+				}
+			}
+		default: //normal
+			switch bvalue[i] {
+			case '\\':
+				escapeType = 1 //json escapin
+			case '%':
+				escapeType = 3 // url escape
+			default:
+				buf.WriteByte(bvalue[i])
+			}
 		}
 		i++
 	}
-	if IsInUnicode{
+	switch escapeType {
+	case 1:
+		buf.WriteByte('\\')
+	case 2:
 		unicodestr := FastByte2String(bvalue[unicodeidx+1:i])
 		if arune,err := strconv.ParseInt(unicodestr,16,32);err==nil{
 			buf.WriteRune(rune(arune))
 		}else{
 			buf.Write(bvalue[unicodeidx:i])
 		}
-	}else if escapein{
-		buf.WriteByte('\\')
 	}
 	return FastByte2String(buf.Bytes())
 }
