@@ -327,7 +327,7 @@ func ParserEscapeStr(bvalue []byte)string {
 					if abyte,err := strconv.ParseInt(bytestr,16,32);err==nil{
 						buf.WriteByte(byte(abyte))
 					}else{
-						buf.Write(bvalue[i:i+j])
+						buf.Write(bvalue[i-1:i+j]) //%要加上
 					}
 					escapeType = 0
 					i += j - 1
