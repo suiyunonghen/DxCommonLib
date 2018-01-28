@@ -57,7 +57,7 @@ func (date *TDateTime)WrapTime2Self(t time.Time)  {
 	*date = TDateTime(float64(days) + times)
 }
 
-func Time2DelphiTime(t time.Time)TDateTime  {
+func Time2DelphiTime(t *time.Time)TDateTime  {
 	days := t.Sub(delphiFirstTime) / (time.Hour * 24)
 	y,m,d := t.Date()
 	nowdate := time.Date(y,m,d,0,0,0,0,time.Local)
@@ -263,6 +263,67 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	return
 }
 
+//Date(1402384458000)
+//Date(1224043200000+0800)
+func ParserJsonTime(jsontime string)TDateTime  {
+	bt := FastString2Byte(jsontime)
+	idx := bytes.Index(bt,[]byte("Date("))
+	if idx > -1{
+		bt = bt[idx+5:]
+		idx = bytes.IndexByte(bt,')')
+		if idx < 0{
+			return -1
+		}
+		bt = bt[:idx]
+		flag := 0
+		var(
+			ms int64
+			err error
+		)
+		idx = bytes.IndexByte(bt,'+')
+		if idx < 0{
+			idx = bytes.IndexByte(bt,'-')
+		}else{
+			flag = 1
+		}
+		if idx < 0{
+			str := FastByte2String(bt[:])
+			if ms,err = strconv.ParseInt(str,10,64);err != nil{
+				return -1
+			}
+			if len(str) > 9{
+				ms = ms / 1000
+			}
+		}else{
+			if flag == 0{
+				flag = -1
+			}
+			str := FastByte2String(bt[:idx])
+			ms,err = strconv.ParseInt(str,10,64)
+			if err != nil{
+				return -1
+			}
+			bt = bt[idx+1:]
+			if len(bt) < 2{
+				return -1
+			}
+			bt = bt[:2]
+			ctz,err := strconv.Atoi(FastByte2String(bt))
+			if err != nil{
+				return -1
+			}
+			if len(str) > 9{
+				ms = ms / 1000
+			}
+			ms += int64(ctz * 60)
+		}
+		ntime := time.Now()
+		ns := ntime.Unix()
+		ntime = ntime.Add((time.Duration(ms - ns)*time.Second))
+		return Time2DelphiTime(&ntime)
+	}
+	return -1
+}
 
 //解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
 func ParserEscapeStr(bvalue []byte)string {
@@ -294,6 +355,8 @@ func ParserEscapeStr(bvalue []byte)string {
 				buf.WriteByte('\b')
 			case '\'':
 				buf.WriteByte('\'')
+			case '/':
+				buf.WriteByte('/')
 			case 'u':
 				escapeType = 2 // unicode decode
 				unicodeidx = i
