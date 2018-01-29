@@ -267,24 +267,27 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 //Date(1224043200000+0800)
 func ParserJsonTime(jsontime string)TDateTime  {
 	bt := FastString2Byte(jsontime)
-	idx := bytes.Index(bt,[]byte("Date("))
-	if idx > -1{
-		bt = bt[idx+5:]
-		idx = bytes.IndexByte(bt,')')
-		if idx < 0{
-			return -1
-		}
-		bt = bt[:idx]
-		flag := 0
+	dtflaglen := 0
+	endlen := 0
+	if  bytes.HasPrefix(bt,[]byte{'D','a','t','e','('}) && bytes.HasSuffix(bt,[]byte{')'}){
+		dtflaglen = 5
+		endlen = 1
+	}else if bytes.HasPrefix(bt,[]byte{'/','D','a','t','e','('}) && bytes.HasSuffix(bt,[]byte{')','/'}){
+		dtflaglen = 6
+		endlen = 2
+	}
+	if dtflaglen > 0{
+		bt = bt[dtflaglen:len(bt)-endlen]
 		var(
 			ms int64
 			err error
 		)
-		idx = bytes.IndexByte(bt,'+')
+		endlen = 0
+		idx := bytes.IndexByte(bt,'+')
 		if idx < 0{
 			idx = bytes.IndexByte(bt,'-')
 		}else{
-			flag = 1
+			endlen = 1
 		}
 		if idx < 0{
 			str := FastByte2String(bt[:])
@@ -295,8 +298,8 @@ func ParserJsonTime(jsontime string)TDateTime  {
 				ms = ms / 1000
 			}
 		}else{
-			if flag == 0{
-				flag = -1
+			if endlen == 0{
+				endlen = -1
 			}
 			str := FastByte2String(bt[:idx])
 			ms,err = strconv.ParseInt(str,10,64)
