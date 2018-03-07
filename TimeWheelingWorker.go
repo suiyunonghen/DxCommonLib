@@ -92,12 +92,26 @@ func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
 	return b
 }
 
+func (worker *TimeWheelWorker)AfterFunc(d time.Duration,afunc func())  {
+	select{
+	case <-worker.After(d):
+		afunc()
+	}
+}
+
 func (worker *TimeWheelWorker) Sleep(d time.Duration) {
-	<-worker.After(d)
+	select{
+	case <-worker.After(d):
+		return
+	}
 }
 
 func After(d time.Duration) <-chan struct{} {
 	return defaultTimeWheelWorker.After(d)
+}
+
+func AfterFunc(d time.Duration,afunc func()) {
+	defaultTimeWheelWorker.AfterFunc(d,afunc)
 }
 
 func Sleep(d time.Duration) {
