@@ -15,6 +15,7 @@ import (
 	"time"
 	"strconv"
 	"unicode/utf16"
+	"encoding/binary"
 	"reflect"
 	"runtime"
 )
@@ -172,6 +173,13 @@ func FastDelphiPchar2String(pcharstr uintptr)string  {
 	return string(utf16.Decode(*(*[] uint16)(unsafe.Pointer(s))))
 }
 
+func FastBytes2Uint16s(bt []byte)[]uint16  {
+	sliceHead := (*reflect.SliceHeader)(unsafe.Pointer(&bt))
+	sliceHead.Len = sliceHead.Len / 2
+	sliceHead.Cap = sliceHead.Cap / 2
+	return *(*[]uint16)(unsafe.Pointer(sliceHead))
+}
+
 //本函数只作为强制转换使用，不可将返回的Slice再做修改处理
 func FastString2Byte(str string)[]byte  {
 	x := (*[2]uintptr)(unsafe.Pointer(&str))
@@ -181,6 +189,40 @@ func FastString2Byte(str string)[]byte  {
 
 func FastByte2String(bt []byte)string  {
 	return *(*string)(unsafe.Pointer(&bt))
+}
+
+func UTF16Byte2string(utf16bt []byte,isBigEnd bool)string  {
+	if !isBigEnd{
+		//判定末尾是否为换行,utf16，识别0
+		btlen := len(utf16bt)
+		if utf16bt[btlen-1] == 0 && utf16bt[btlen-2]=='\n'{
+			utf16bt = utf16bt[:btlen-2]
+			btlen -= 2
+		}else if utf16bt[btlen - 1] == '\n'{
+			utf16bt = utf16bt[:btlen-1]
+			btlen--
+		}
+		if utf16bt[btlen-1] == 0 && utf16bt[btlen-2]=='\r'{
+			utf16bt = utf16bt[:btlen-2]
+		}else if utf16bt[btlen - 1] == '\r'{
+			utf16bt = utf16bt[:btlen-1]
+			btlen--
+		}
+		return string(utf16.Decode(FastBytes2Uint16s(utf16bt)))
+	}
+	arrlen := len(utf16bt) / 2
+	uint16arr := make([]uint16,arrlen)
+	for j,i:=0,0;j<arrlen;j,i=j+1,i+2{
+		if j == arrlen-1{
+			if utf16bt[i]== '\r' || utf16bt[i+1]=='\r'{
+				arrlen--
+				break
+			}
+		}else{
+			uint16arr[j] = binary.BigEndian.Uint16(utf16bt[i:i+2])
+		}
+	}
+	return string(utf16.Decode(uint16arr[:arrlen]))
 }
 
 //将drwxrwx这些转化为 FileMode
