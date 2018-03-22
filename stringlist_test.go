@@ -11,11 +11,11 @@ func TestStringList(t *testing.T) {
 		lst.Add("测试不得闲,adfadfadsfadf1")
 	}
 	lst.SaveToFile("d:\\t.txt")
-	//fmt.Println(lst.Text())
 	lst.Clear()
 	fmt.Println(lst.Text())
 	lst.LoadFromFile("d:\\t.txt")
 	fmt.Println(lst.Count())
+	fmt.Println(lst.Text())
 	fmt.Println(lst.Strings(2))
 
 	lst.Clear()

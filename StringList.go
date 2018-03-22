@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"io"
+	"bufio"
 )
 
 type (
@@ -102,19 +104,63 @@ func (lst *GStringList) SetText(text string) {
 func (lst *GStringList) LoadFromFile(fileName string) {
 	if finfo, err := os.Stat(fileName); err == nil && !finfo.IsDir() {
 		if file, err := os.Open(fileName); err == nil {
-			databytes := make([]byte, finfo.Size())
-			file.Read(databytes)
-			isUtf8 := databytes[0] == 0xEF && databytes[1] == 0xBB && databytes[2] == 0xBF
-			if isUtf8 {
-				databytes = databytes[3:]
+			//先判定文件格式，是否为utf8或者utf16，去掉BOM
+			if lst.strings == nil{
+				lst.strings = make([]string,0,100)
+			}else{
+				lst.strings = lst.strings[:0]
 			}
-			file.Close()
-			if !isUtf8 && lst.UnknownCodeUseGbk {
-				if tmpbytes, err := GBK2Utf8(databytes); err == nil {
-					databytes = tmpbytes
+			defer file.Close()
+			var bt [3]byte
+			filecodeType := File_Code_Unknown
+			if _,err := file.Read(bt[:3]);err==nil{
+				if bt[0] == 0xFF && bt[1] == 0xFE { //UTF-16(Little Endian)
+					file.Seek(-1,io.SeekCurrent)
+					filecodeType = File_Code_Utf16LE
+				}else if bt[0] == 0xFE && bt[1] == 0xFF{ //UTF-16(big Endian)
+					file.Seek(-1,io.SeekCurrent)
+					filecodeType = File_Code_Utf16BE
+				}else if bt[0] == 0xEF && bt[1] == 0xBB && bt[2] == 0xBF { //UTF-8
+					filecodeType = File_Code_Utf8
+				}else{
+					file.Seek(-3,io.SeekCurrent)
 				}
 			}
-			lst.strings = strings.Split(FastByte2String(databytes), lst.LineBreakStr())
+			reader := bufio.NewReader(file)
+			for{
+				line,err := reader.ReadBytes('\n')
+				if filecodeType == File_Code_Utf16LE{ //小端结尾多一个空白的0标记
+					reader.ReadByte()
+				}
+				if err == nil || err == io.EOF{
+					linelen := len(line)
+					if linelen > 2{
+						if line[linelen-2] == '\r'{
+							line = line[:linelen - 2]
+						}else if line[linelen - 1] == '\n'{
+							line = line[:linelen-1]
+						}
+					}
+					if linelen>0{
+						if filecodeType == File_Code_Utf8{
+							lst.Add(FastByte2String(line))
+						}else if filecodeType == File_Code_Utf16LE || filecodeType == File_Code_Utf16BE {
+							lst.Add(UTF16Byte2string(line,filecodeType == File_Code_Utf16BE))
+						}else if lst.UnknownCodeUseGbk || filecodeType == File_Code_GBK{
+							if tmpbytes, err := GBK2Utf8(line); err == nil {
+								lst.Add(FastByte2String(tmpbytes))
+							}
+						}
+					}else{
+						lst.Add("")
+					}
+					if err != nil{
+						return
+					}
+				}else{
+					return
+				}
+			}
 		}
 	}
 }
@@ -122,10 +168,17 @@ func (lst *GStringList) LoadFromFile(fileName string) {
 func (lst *GStringList) SaveToFile(fileName string) {
 	//文件要先写入UTF8的BOM
 	if file, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC, 0644); err == nil {
-		if lst.Count() > 0 {
+		count := lst.Count()
+		if count > 0 {
 			file.Write([]byte{0xEF, 0xBB, 0xBF})
 			//写入内容
-			file.Write(FastString2Byte(lst.Text()))
+			//file.Write(FastString2Byte(lst.Text()))
+			for i := 0;i<count;i++{
+				file.WriteString(lst.strings[i])
+				if i < count - 1{
+					file.WriteString(lst.LineBreakStr())
+				}
+			}
 		}
 		file.Close()
 	}
