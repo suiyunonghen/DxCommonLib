@@ -7,7 +7,7 @@ import (
 type (
 	FileCodeMode  uint8			//文件格式
 
-	FileOpenMode	uint32		//文件打开方式
+	FileOpenMode	int		//文件打开方式
 )
 
 
@@ -21,10 +21,10 @@ const(
 )
 
 const(
-	FMCreate FileOpenMode = os.O_CREATE | os.O_WRONLY | os.O_TRUNC
-	FMOpenRead FileOpenMode = os.O_RDONLY
-	FMOpenWrite FileOpenMode = os.O_WRONLY | os.O_APPEND
-	FMOpenReadWrite FileOpenMode = os.O_RDWR | os.O_APPEND
+	FMCreate FileOpenMode = FileOpenMode(os.O_CREATE | os.O_WRONLY | os.O_TRUNC)
+	FMOpenRead FileOpenMode = FileOpenMode(os.O_RDONLY)
+	FMOpenWrite FileOpenMode = FileOpenMode(os.O_WRONLY | os.O_APPEND)
+	FMOpenReadWrite FileOpenMode = FileOpenMode(os.O_RDWR | os.O_APPEND)
 
 )
 
@@ -46,7 +46,7 @@ func NewFileStream(fileName string,openMode FileOpenMode) (*GFileStream,error)  
 	}
 	stream := &GFileStream{}
 	stream.file = file
-	return stream
+	return stream,nil
 }
 
 
