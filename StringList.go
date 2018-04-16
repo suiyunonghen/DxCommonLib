@@ -142,13 +142,16 @@ func (lst *GStringList) LoadFromFile(fileName string) {
 						}
 					}
 					if linelen>0{
-						if filecodeType == File_Code_Utf8{
+						switch filecodeType {
+						case File_Code_Utf8:
 							lst.Add(FastByte2String(line))
-						}else if filecodeType == File_Code_Utf16LE || filecodeType == File_Code_Utf16BE {
+						case File_Code_Utf16LE,File_Code_Utf16BE:
 							lst.Add(UTF16Byte2string(line,filecodeType == File_Code_Utf16BE))
-						}else if lst.UnknownCodeUseGbk || filecodeType == File_Code_GBK{
+						case File_Code_GBK,File_Code_Unknown:
 							if tmpbytes, err := GBK2Utf8(line); err == nil {
 								lst.Add(FastByte2String(tmpbytes))
+							}else{
+								lst.Add(FastByte2String(line))
 							}
 						}
 					}else{
