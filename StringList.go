@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"io"
+	"bytes"
 	"bufio"
 )
 
@@ -94,7 +95,15 @@ func (lst *GStringList) Text() string {
 	if lst.Count() == 0 {
 		return ""
 	}
-	return strings.Join(lst.strings, lst.LineBreakStr())
+	buffer := bytes.NewBuffer(make([]byte,0,1024))
+	count := lst.Count()
+	for i := 0;i<count;i++{
+		buffer.WriteString(lst.strings[i])
+		if i < count - 1{
+			buffer.WriteString(lst.LineBreakStr())
+		}
+	}
+	return FastByte2String(buffer.Bytes())
 }
 
 func (lst *GStringList) SetText(text string) {
@@ -175,13 +184,14 @@ func (lst *GStringList) SaveToFile(fileName string) {
 		if count > 0 {
 			file.Write([]byte{0xEF, 0xBB, 0xBF})
 			//写入内容
-			//file.Write(FastString2Byte(lst.Text()))
+			buffer := bytes.NewBuffer(make([]byte,0,1024))
 			for i := 0;i<count;i++{
-				file.WriteString(lst.strings[i])
+				buffer.WriteString(lst.strings[i])
 				if i < count - 1{
-					file.WriteString(lst.LineBreakStr())
+					buffer.WriteString(lst.LineBreakStr())
 				}
 			}
+			file.Write(buffer.Bytes())
 		}
 		file.Close()
 	}
