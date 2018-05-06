@@ -118,6 +118,18 @@ func Sleep(d time.Duration) {
 	defaultTimeWheelWorker.Sleep(d)
 }
 
+func ReSetDefaultTimeWheel(Chkinterval time.Duration,slotBlockCount int){
+	if defaultTimeWheelWorker.interval != Chkinterval  ||
+		defaultTimeWheelWorker.slockcount != slotBlockCount{
+			defaultTimeWheelWorker.Stop()
+			defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, func() {
+				t := time.Now().Truncate(Chkinterval)
+				coarseTime.Store(&t)
+			})
+	}
+}
+
+
 func init()  {
 	defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200, func() {
 		t := time.Now().Truncate(time.Millisecond*500)
