@@ -143,7 +143,7 @@ func (lst *GStringList) LoadFromFile(fileName string) {
 				}
 				if err == nil || err == io.EOF{
 					linelen := len(line)
-					if linelen > 2{
+					if linelen >= 2{
 						if line[linelen-2] == '\r'{
 							line = line[:linelen - 2]
 						}else if line[linelen - 1] == '\n'{
