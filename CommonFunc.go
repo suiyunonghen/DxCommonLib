@@ -182,9 +182,12 @@ func FastBytes2Uint16s(bt []byte)[]uint16  {
 
 //本函数只作为强制转换使用，不可将返回的Slice再做修改处理
 func FastString2Byte(str string)[]byte  {
-	x := (*[2]uintptr)(unsafe.Pointer(&str))
-	h := [3]uintptr{x[0],x[1],x[1]}
-	return *(*[]byte)(unsafe.Pointer(&h))
+	strHead := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	var sliceHead reflect.SliceHeader
+	sliceHead.Len = strHead.Len
+	sliceHead.Data = strHead.Data
+	sliceHead.Cap = strHead.Len
+	return *(*[]byte)(unsafe.Pointer(&sliceHead))
 }
 
 func FastByte2String(bt []byte)string  {
