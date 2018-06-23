@@ -57,8 +57,43 @@ func (bt *DxBits)SetBits(index uint,v bool)  {
 	if index < bt.fsize{
 		btindex := index / 8
 		index = index % 8
+		if v {
+			realv := byte(1 << uint(index))
+			bt.buffer[btindex] = bt.buffer[btindex] | realv
+		}else{
+			realv := byte(1 << uint(index))
+			realv = ^realv
+			bt.buffer[btindex] = bt.buffer[btindex] & realv
+		}
+	}
+}
+
+//将指定的位取反，如果指定的位为-1，则将全部的位各自取反，1变0,0变1
+func (bt *DxBits)NotBits(index int){
+	if index < 0{
+		for idx,v := range bt.buffer{
+			for i := 0;i<8;i++{
+				realv := byte(1 << uint(i))
+				if v & realv == realv{
+					realv = ^realv
+					v = v & realv
+				}else{
+					v = v | realv
+				}
+			}
+			bt.buffer[idx] = v
+		}
+	}else{
+		btindex := index / 8
+		index = index % 8
 		realv := byte(1 << uint(index))
-		bt.buffer[btindex] = bt.buffer[btindex] | realv
+		oldBitValid := bt.buffer[btindex] & realv == realv
+		if oldBitValid{
+			realv = ^realv
+			bt.buffer[btindex] = bt.buffer[btindex] & realv
+		}else{
+			bt.buffer[btindex] = bt.buffer[btindex] | realv
+		}
 	}
 }
 
