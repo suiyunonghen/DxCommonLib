@@ -10,6 +10,27 @@ type  DxBits struct{
 	fsize	uint				//存放的bit位数是多少
 }
 
+func (bt *DxBits)Count()uint  {
+	return bt.fsize
+}
+
+//选中的位的个数
+func (bt *DxBits)CheckedCount()uint  {
+	if bt.fsize == 0{
+		return 0
+	}
+	result := uint(0)
+	for _,v := range bt.buffer{
+		for i := 0;i<8;i++{
+			realv := byte(1 << uint(i))
+			if v & realv == realv{
+				result++
+			}
+		}
+	}
+	return result
+}
+
 func (bt *DxBits)ReSet(bsize uint)  {
 	if bsize == 0{
 		bt.buffer = nil
