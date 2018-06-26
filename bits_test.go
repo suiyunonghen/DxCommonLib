@@ -18,3 +18,28 @@ func TestTDxBits_Bits(t *testing.T) {
 	bits.NotBits(-1)
 	fmt.Println(bits.AsInt32())
 }
+
+func TestGFileStream_Read(t *testing.T) {
+	stream,_ := NewFileStream(`E:\Delphi\Controls\UI\Skin\DXScene v4.42\dx_vgcore.pas`,FMOpenRead,4096)
+	mb := make([]byte,4096*2+100)
+	a := stream.Read(mb)
+	fmt.Println(a)
+	fmt.Println(string(mb))
+	fmt.Println(stream.FilePosition())
+	fmt.Println(stream.Position())
+
+	stream.Read(mb)
+	fmt.Println(stream.FilePosition())
+
+	fmt.Println(string(mb))
+	stream.Read(mb)
+	fmt.Println(string(mb))
+	stream.Read(mb)
+	fmt.Println(string(mb))
+}
+
+func TestGFileStream_Write(t *testing.T) {
+	stream,_ := NewFileStream(`E:\1.txt`,FMOpenReadWrite,4096)
+	stream.Write([]byte("测试不得闲"))
+	stream.Close()
+}
