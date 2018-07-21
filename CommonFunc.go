@@ -373,6 +373,61 @@ func ParserJsonTime(jsontime string)TDateTime  {
 	return -1
 }
 
+//将内容转义成Json字符串
+func EscapeJsonStr(str string) string {
+	var buf bytes.Buffer
+	for _,runedata := range str{
+		switch runedata {
+		case '\t':
+			buf.WriteByte('\\')
+			buf.WriteByte('t')
+		case '\f':
+			buf.WriteByte('\\')
+			buf.WriteByte('f')
+		case '\r':
+			buf.WriteByte('\\')
+			buf.WriteByte('r')
+		case '\n':
+			buf.WriteByte('\\')
+			buf.WriteByte('n')
+		case '\\':
+			buf.WriteByte('\\')
+			buf.WriteByte('\\')
+		case '"':
+			buf.WriteByte('\\')
+			buf.WriteByte('"')
+		case '\b':
+			buf.WriteByte('\\')
+			buf.WriteByte('b')
+		case '\'':
+			buf.WriteByte('\\')
+			buf.WriteByte('\'')
+		case '/':
+			buf.WriteByte('\\')
+			buf.WriteByte('/')
+		default:
+			if runedata < 256{
+				buf.WriteByte(byte(runedata))
+			}else{
+				buf.Write([]byte{'\\','u'})
+				var b [4]byte
+				binary.BigEndian.PutUint32(b[:],uint32(runedata))
+				if b[0]==0 && b[1] == 0{
+					hexstr := Binary2Hex(b[2:])
+					buf.WriteString(hexstr)
+				}else{
+					hexstr := Binary2Hex(b[0:2])
+					buf.WriteString(hexstr)
+					buf.Write([]byte{'\\','u'})
+					hexstr = Binary2Hex(b[2:])
+					buf.WriteString(hexstr)
+				}
+			}
+		}
+	}
+	return FastByte2String(buf.Bytes())
+}
+
 //解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
 func ParserEscapeStr(bvalue []byte)string {
 	blen := len(bvalue)
