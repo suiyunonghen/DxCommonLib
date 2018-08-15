@@ -22,7 +22,7 @@ func TestTDxBits_Bits(t *testing.T) {
 func TestGFileStream_Read(t *testing.T) {
 	stream,_ := NewFileStream(`E:\Delphi\Controls\UI\Skin\DXScene v4.42\dx_vgcore.pas`,FMOpenRead,4096)
 	mb := make([]byte,4096*2+100)
-	a := stream.Read(mb)
+	a,_ := stream.Read(mb)
 	fmt.Println(a)
 	fmt.Println(string(mb))
 	fmt.Println(stream.FilePosition())

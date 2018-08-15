@@ -59,16 +59,31 @@ func (stream *GFileStream)FlushBuffer() error {
 	return nil
 }
 
-func (stream *GFileStream)Read(buffer []byte)int  {
+func (stream *GFileStream)Seek(offset int64, whence int) (int64, error){
+	fpostion := stream.FilePosition()
+	if fpostion == offset{
+		return fpostion,nil
+	}
+	ret,err := stream.file.Seek(offset,whence)
+	if err==nil{ //重新计算位置和缓存区域
+		stream.fbufferStart = int(stream.FilePosition())
+		stream.fbufferRW = 0
+		bfend,_ := stream.file.Read(stream.fCache)
+		stream.fbufferEnd = bfend + stream.fbufferStart
+	}
+	return ret,err
+}
+
+
+func (stream *GFileStream)Read(buffer []byte) (n int, err error)  {
 	stream.FlushBuffer()
 	bflen := len(buffer)
 	if bflen == 0{
-		return 0
+		return 0,nil
 	}
 	if stream.fbufferStart < 0{ //未处理，重新设定位置读取
 		if uint(bflen) >= stream.fcacheSize{
-			rln,_ := stream.file.Read(buffer)
-			return rln
+			return stream.file.Read(buffer)
 		}else{
 			stream.fbufferStart = int(stream.FilePosition())
 			bfend,_ := stream.file.Read(stream.fCache)
@@ -79,31 +94,38 @@ func (stream *GFileStream)Read(buffer []byte)int  {
 	if hasleave >= bflen{
 		rln := copy(buffer,stream.fCache[stream.fbufferRW:stream.fbufferRW + bflen])
 		stream.fbufferRW += rln
-		return rln
+		return rln,nil
 	}
 	copy(buffer,stream.fCache[stream.fbufferRW:])
 	if uint(stream.fbufferEnd - stream.fbufferStart) < stream.fcacheSize{
-		return int(hasleave)
+		return int(hasleave),nil
 	}
 	bflen -= hasleave
 	if uint(bflen) >= stream.fcacheSize{
 		rln,err := stream.file.Read(buffer[hasleave:])
 		if err != nil{
-			return rln + int(hasleave)
+			return rln + int(hasleave),err
 		}
 		stream.fbufferStart = int(stream.FilePosition())
 		stream.fbufferRW = 0
-		bfend,_ := stream.file.Read(stream.fCache)
+		bfend,err := stream.file.Read(stream.fCache)
 		stream.fbufferEnd = bfend + stream.fbufferStart
-		return rln + int(hasleave)
+		return rln + int(hasleave),err
 	}else{
 		stream.fbufferStart = stream.fbufferEnd
 		stream.fbufferRW = 0
-		bfend,_ := stream.file.Read(stream.fCache)
+		bfend,err := stream.file.Read(stream.fCache)
+		if err != nil{
+			return bfend,err
+		}
 		stream.fbufferEnd = bfend + stream.fbufferStart
 		hasread := int(hasleave)
-		hasread += stream.Read(buffer[hasread:])
-		return hasread
+		rl,err := stream.Read(buffer[hasread:])
+		if err != nil{
+			return hasread,err
+		}
+		hasread+=rl
+		return hasread,err
 	}
 }
 
@@ -116,6 +138,9 @@ func (stream *GFileStream)Position()int  {
 }
 
 func (stream *GFileStream)SetPosition(ps int) error {
+	if ps < 0{
+		return nil
+	}
 	if stream.fbufferStart < 0{
 		_,err := stream.file.Seek(int64(ps),io.SeekStart)
 		return err
@@ -184,6 +209,76 @@ func (stream *GFileStream)Write(data []byte)(int,error)  {
 	}
 	return wln,nil
 }
+
+//ReaderFrom interface
+func (stream *GFileStream)ReadFrom(r io.Reader) (n int64, err error)  {
+	var m [4096]byte
+	realLen := int64(0)
+	for{
+		rlen,err := r.Read(m[:])
+		if rlen > 0{
+			stream.Write(m[:rlen])
+		}
+		realLen += int64(rlen)
+		if rlen < 4096{
+			stream.FlushBuffer()
+			return realLen,nil
+		}
+		if err != nil{
+			stream.FlushBuffer()
+			return realLen,err
+		}
+	}
+}
+
+//WriterTo interface
+func (stream *GFileStream)WriteTo(w io.Writer) (n int64, err error)  {
+	stream.SetPosition(0)
+	var m [4096]byte
+	realLen := int64(0)
+	for{
+		rlen,err := stream.Read(m[:])
+		if rlen > 0{
+			w.Write(m[:rlen])
+		}
+		realLen += int64(rlen)
+		if rlen < 4096{
+			return realLen,nil
+		}
+		if err != nil{
+			return realLen,err
+		}
+	}
+}
+
+//ReaderAt interface
+func (stream *GFileStream)ReadAt(p []byte, off int64) (n int, err error){
+	stream.SetPosition(int(off))
+	return stream.Read(p)
+}
+
+//WriterAt  interface
+func (stream *GFileStream)WriteAt(p []byte, off int64) (n int, err error){
+	stream.SetPosition(int(off))
+	return stream.Write(p)
+}
+
+//ByteReader
+func (stream *GFileStream)ReadByte() (byte, error){
+	var b [1]byte
+	_,err := stream.Read(b[:])
+	return b[0],err
+}
+
+func (stream *GFileStream)UnreadByte() error{
+	return stream.SetPosition(stream.Position()-1)
+}
+
+func (stream *GFileStream)WriteByte(c byte) error{
+	_,err := stream.Write([]byte{c})
+	return err
+}
+
 
 func (stream *GFileStream)Size()int64  {
 	pos,_ := stream.file.Seek(0,io.SeekCurrent)
