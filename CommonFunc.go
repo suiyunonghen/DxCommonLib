@@ -39,6 +39,27 @@ func init() {
 	delphiFirstTime = time.Date(1899,12,30,0,0,0,0,time.Local)
 }
 
+//内存拷贝函数
+//go:linkname CopyMemory runtime.memmove
+func CopyMemory(to, from unsafe.Pointer, n uintptr)
+
+//清空内存
+//go:linkname ZeroMemory runtime.memclrNoHeapPointers
+func ZeroMemory(ptr unsafe.Pointer, n uintptr)
+
+//go:linkname memequal runtime.memequal
+func memequal(a, b unsafe.Pointer, size uintptr)bool
+
+//go:linkname memequal_varlen runtime.memequal_varlen
+func memequal_varlen(a, b unsafe.Pointer)bool
+
+//内存比较函数
+func CompareMem(a,b unsafe.Pointer,size int)bool  {
+	if size <= 0{
+		return memequal_varlen(a,b)
+	}
+	return memequal(a,b,uintptr(size))
+}
 
 /*
 从Delphi日期转为Go日期格式
@@ -172,6 +193,8 @@ func FastDelphiPchar2String(pcharstr uintptr)string  {
 	s.Cap = s.Len
 	return string(utf16.Decode(*(*[] uint16)(unsafe.Pointer(s))))
 }
+
+
 
 func FastBytes2Uint16s(bt []byte)[]uint16  {
 	sliceHead := (*reflect.SliceHeader)(unsafe.Pointer(&bt))

@@ -3,8 +3,26 @@ package DxCommonLib
 import (
 	"testing"
 	"fmt"
+	"unsafe"
 )
 
+
+
+
+func TestMemMove(t *testing.T)  {
+	m := ([]byte)("12345678")
+	b := make([]byte,20)
+	CopyMemory(unsafe.Pointer(&b[0]),unsafe.Pointer(&m[0]),uintptr(len(m)))
+
+	fmt.Println(string(b))
+	fmt.Println(b)
+	fmt.Println(m)
+	if CompareMem(unsafe.Pointer(&m[0]),unsafe.Pointer(&b[0]),len(m)){
+		ZeroMemory(unsafe.Pointer(&m[0]),uintptr(len(m)))
+		fmt.Println("内存相等")
+	}
+	fmt.Println(m)
+}
 func TestTDxBits_Bits(t *testing.T) {
 	bits := DxBits{}
 	bits.ReSetByInt32(255)
@@ -18,6 +36,9 @@ func TestTDxBits_Bits(t *testing.T) {
 	bits.NotBits(-1)
 	fmt.Println(bits.AsInt32())
 }
+
+
+
 
 func TestGFileStream_Read(t *testing.T) {
 	stream,_ := NewFileStream(`E:\Delphi\Controls\UI\Skin\DXScene v4.42\dx_vgcore.pas`,FMOpenRead,4096)
