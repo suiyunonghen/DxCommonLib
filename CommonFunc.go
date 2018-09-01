@@ -61,6 +61,13 @@ func CompareMem(a,b unsafe.Pointer,size int)bool  {
 	return memequal(a,b,uintptr(size))
 }
 
+func ZeroByteSlice(bt []byte)  {
+	btlen := len(bt)
+	if btlen > 0{
+		ZeroMemory(unsafe.Pointer(&bt[0]),uintptr(btlen))
+	}
+}
+
 /*
 从Delphi日期转为Go日期格式
 Delphi的日期规则为到1899-12-30号的天数+当前的毫秒数/一天的总共毫秒数集合
