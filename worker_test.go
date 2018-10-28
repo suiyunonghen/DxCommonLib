@@ -10,7 +10,7 @@ func worktest(data ...interface{}) {
 	if len(data) < 3 {
 		Sleep(time.Second)
 	}
-	fmt.Println(data)
+	fmt.Println(data...)
 }
 
 func TestWorker(t *testing.T) {
@@ -23,4 +23,37 @@ func TestWorker(t *testing.T) {
 	<-After(time.Second * 12)
 	fmt.Println("准备关闭")
 	work.Stop()
+}
+
+func TestTimeWheelWorker_After(t *testing.T) {
+	mm := NewTimeWheelWorker(time.Millisecond*500,10,nil)
+	fmt.Println(time.Now())
+	c1 := mm.After(time.Second * 18)
+	c2 := mm.After(time.Second * 8)
+	c3 := mm.After(time.Second * 18)
+	go func() {
+		select{
+		case <-c2:
+			fmt.Println("C2触发：")
+			fmt.Println(time.Now())
+		}
+	}()
+
+	go func() {
+		select{
+		case <-c3:
+			fmt.Println("C3触发：")
+			fmt.Println(time.Now())
+		}
+	}()
+
+	go func() {
+		select{
+		case <-c1:
+			fmt.Println("C1触发：")
+			fmt.Println(time.Now())
+		}
+	}()
+
+	<-c1
 }

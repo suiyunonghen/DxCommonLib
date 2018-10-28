@@ -7,23 +7,34 @@ package DxCommonLib
 
 import (
 	"sync"
-	"time"
 	"sync/atomic"
+	"time"
 )
 
 type (
+
+	//每个槽中的记录对象
+	slotRecord struct {
+		curWheelIndex		int			//当前轮询的索引
+		wheelCount			int			//需要轮询多少次触发
+		notifychan			chan struct{} //通知
+		next				*slotRecord	//下一个轮询点
+	}
+
 	TimeWheelWorker struct {
 		sync.Mutex                 //调度锁
 		ticker     *time.Ticker    //调度器时钟
-		timeslocks []chan struct{} //时间槽
+		timeslocks []*slotRecord   //时间槽
 		slockcount int
 		maxTimeout time.Duration
 		quitchan   chan struct{}
 		curindex   int //当前的索引
 		interval   time.Duration
 		tkfunc		func()
+		recordPool	sync.Pool
 	}
 )
+
 
 var (
 	defaultTimeWheelWorker *TimeWheelWorker
@@ -39,7 +50,7 @@ func NewTimeWheelWorker(interval time.Duration, slotBlockCount int,tkfunc func()
 	result.slockcount = slotBlockCount
 	result.tkfunc = tkfunc
 	result.maxTimeout = interval * time.Duration(slotBlockCount)
-	result.timeslocks = make([]chan struct{}, slotBlockCount)
+	result.timeslocks = make([]*slotRecord, slotBlockCount)
 	result.ticker = time.NewTicker(interval)
 	go result.run()
 	return result
@@ -52,13 +63,33 @@ func (worker *TimeWheelWorker) run() {
 			//执行定时操作
 			//获取当前的时间槽数据
 			worker.Lock()
-			lastC := worker.timeslocks[worker.curindex]
-			worker.timeslocks[worker.curindex] = make(chan struct{})
+			lastrec := worker.timeslocks[worker.curindex]
+			if lastrec != nil{
+				var firstrec *slotRecord
+				for{
+					currec := lastrec.next
+					lastrec.curWheelIndex++
+					if lastrec.curWheelIndex >= lastrec.wheelCount{ //断开
+						worker.freeRecord(lastrec)
+					}else if firstrec == nil{
+						firstrec = lastrec //插入的时候就直接按照wheelCount大小排序了，只用增加一个个的序号就行了
+						for currec != nil{
+							currec.curWheelIndex++
+							currec = currec.next
+						}
+						break
+					}/*else{
+						firstrec.next = lastrec
+					}*/
+					if currec == nil{
+						break
+					}
+					lastrec = currec
+				}
+				worker.timeslocks[worker.curindex] = firstrec
+			}
 			worker.curindex = (worker.curindex + 1) % worker.slockcount
 			worker.Unlock()
-			if lastC != nil {
-				close(lastC)
-			}
 			if worker.tkfunc!=nil{
 				worker.tkfunc()
 			}
@@ -73,23 +104,73 @@ func (worker *TimeWheelWorker) Stop() {
 	close(worker.quitchan)
 }
 
-func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
-	if d >= worker.maxTimeout {
-		panic("timeout too much, over maxtimeout")
+func (worker *TimeWheelWorker)getRecord(wheelcount int)*slotRecord  {
+	var result *slotRecord
+	v := worker.recordPool.Get()
+	if v!=nil{
+		result = v.(*slotRecord)
+	}else{
+		result = new(slotRecord)
 	}
-	index := int(d / worker.interval)
+	result.curWheelIndex = 0
+	result.wheelCount = wheelcount
+	result.notifychan = make(chan struct{})
+	result.next = nil
+	return result
+}
+
+func (worker *TimeWheelWorker)freeRecord(rec *slotRecord)  {
+	rec.next = nil
+	close(rec.notifychan)
+	rec.notifychan = nil
+	rec.wheelCount = 0
+	rec.curWheelIndex = 0
+	worker.recordPool.Put(rec)
+}
+
+func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
+	index := int(d / worker.interval) //触发多少次到
+	wheelcount := int(index / worker.slockcount)
+	if index % worker.slockcount > 0{
+		wheelcount++
+	}
 	if index > 0 {
 		index--
 	}
 	worker.Lock()
 	index = (worker.curindex + index) % worker.slockcount
-	b := worker.timeslocks[index]
-	if b == nil {
-		b = make(chan struct{})
-		worker.timeslocks[index] = b
+	rec := worker.timeslocks[index]
+	if rec == nil {
+		rec = worker.getRecord(wheelcount)
+		worker.timeslocks[index] = rec
+	}else{ //查找对应的位置
+		var last *slotRecord=nil
+		for{
+			currec := rec.next
+			if wheelcount < rec.wheelCount{
+				currec = worker.getRecord(wheelcount)
+				currec.next = rec
+				if last == nil{
+					worker.timeslocks[index] = currec
+				}else{
+					last.next = currec
+				}
+				rec = currec
+				break
+			}else if wheelcount == rec.wheelCount{ //已经存在，直接退出
+				break
+			}else if currec == nil{
+				currec = worker.getRecord(wheelcount) //链接一个新的
+				rec.next = currec
+				rec = currec
+				break
+			}
+			last = rec
+			rec = currec
+		}
 	}
 	worker.Unlock()
-	return b
+	return rec.notifychan
 }
 
 func (worker *TimeWheelWorker)AfterFunc(d time.Duration,afunc func())  {
