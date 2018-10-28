@@ -26,7 +26,7 @@ func TestWorker(t *testing.T) {
 }
 
 func TestTimeWheelWorker_After(t *testing.T) {
-	mm := NewTimeWheelWorker(time.Millisecond*500,5,nil)
+	mm := NewTimeWheelWorker(time.Millisecond*2,6000,nil)//目前只能精确到2毫秒,低于2毫秒，就不行了
 	fmt.Println(time.Now())
 	c1 := mm.After(time.Second * 18)
 	c2 := mm.After(time.Second * 8)
