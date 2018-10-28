@@ -26,15 +26,33 @@ func TestWorker(t *testing.T) {
 }
 
 func TestTimeWheelWorker_After(t *testing.T) {
-	mm := NewTimeWheelWorker(time.Millisecond*500,10,nil)
+	mm := NewTimeWheelWorker(time.Millisecond*500,5,nil)
 	fmt.Println(time.Now())
 	c1 := mm.After(time.Second * 18)
 	c2 := mm.After(time.Second * 8)
 	c3 := mm.After(time.Second * 18)
+	c4 := mm.After(time.Millisecond * 500)
+	c5 := mm.After(time.Second * 2)
 	go func() {
 		select{
 		case <-c2:
 			fmt.Println("C2触发：")
+			fmt.Println(time.Now())
+		}
+	}()
+
+	go func() {
+		select{
+		case <-c4:
+			fmt.Println("C4触发：")
+			fmt.Println(time.Now())
+		}
+	}()
+
+	go func() {
+		select{
+		case <-c5:
+			fmt.Println("C5触发：")
 			fmt.Println(time.Now())
 		}
 	}()
