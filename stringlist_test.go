@@ -26,3 +26,4 @@ func TestStringList(t *testing.T) {
 	fmt.Println(lst.ValueFromIndex(1))
 	fmt.Println(lst.IndexOfName("Age"))
 }
+
