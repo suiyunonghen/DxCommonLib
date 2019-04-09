@@ -498,8 +498,8 @@ func ParserEscapeStr(bvalue []byte)string {
 				buf.WriteByte(bvalue[i])
 			}
 		case 2: //unicode decode
-			if (bvalue[i]>='0' && bvalue[i] <= '9' || bvalue[i] >'a' && bvalue[i] <= 'f' ||
-				bvalue[i] >'A' && bvalue[i] <= 'F') && i - unicodeidx <= 4{
+			if (bvalue[i]>='0' && bvalue[i] <= '9' || bvalue[i] >='a' && bvalue[i] <= 'f' ||
+				bvalue[i] >='A' && bvalue[i] <= 'F') && i - unicodeidx <= 4{
 				//还是正常的Unicode字符，4个字符为一组
 				//escapeType = 2
 			}else{
@@ -514,8 +514,8 @@ func ParserEscapeStr(bvalue []byte)string {
 			}
 		case 3: //url escape
 			for j := 0;j<3;j++{
-				if (bvalue[j+i]>='0' && bvalue[j+i] <= '9' || bvalue[i+j] >'a' && bvalue[i+j] <= 'f' ||
-					bvalue[j+i] >'A' && bvalue[j+i] <= 'F') && j<2{
+				if (bvalue[j+i]>='0' && bvalue[j+i] <= '9' || bvalue[i+j] >='a' && bvalue[i+j] <= 'f' ||
+					bvalue[j+i] >='A' && bvalue[j+i] <= 'F') && j<2{
 					//还是正常的Byte字符，2个字符为一组
 					//escapeType = 2
 				}else{
