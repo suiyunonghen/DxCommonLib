@@ -432,9 +432,9 @@ func EscapeJsonStr(str string) string {
 		case '\'':
 			buf.WriteByte('\\')
 			buf.WriteByte('\'')
-		case '/':
+		/*case '/':
 			buf.WriteByte('\\')
-			buf.WriteByte('/')
+			buf.WriteByte('/')*/
 		default:
 			if runedata < 256{
 				buf.WriteByte(byte(runedata))
