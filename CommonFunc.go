@@ -429,12 +429,12 @@ func EscapeJsonStr(str string) string {
 		case '\b':
 			buf.WriteByte('\\')
 			buf.WriteByte('b')
-		case '\'':
-			buf.WriteByte('\\')
-			buf.WriteByte('\'')
-		/*case '/':
-			buf.WriteByte('\\')
-			buf.WriteByte('/')*/
+			/*case '\'':
+				buf.WriteByte('\\')
+				buf.WriteByte('\'')
+			case '/':
+				buf.WriteByte('\\')
+				buf.WriteByte('/')*/
 		default:
 			if runedata < 256{
 				buf.WriteByte(byte(runedata))
@@ -486,10 +486,10 @@ func ParserEscapeStr(bvalue []byte)string {
 				buf.WriteByte('"')
 			case 'b':
 				buf.WriteByte('\b')
-			case '\'':
+			/*case '\'':
 				buf.WriteByte('\'')
 			case '/':
-				buf.WriteByte('/')
+				buf.WriteByte('/')*/
 			case 'u':
 				escapeType = 2 // unicode decode
 				unicodeidx = i
