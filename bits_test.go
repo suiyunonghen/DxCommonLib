@@ -1,6 +1,8 @@
 package DxCommonLib
 
 import (
+	"encoding/binary"
+	"os"
 	"testing"
 	"fmt"
 	"unsafe"
@@ -38,7 +40,16 @@ func TestTDxBits_Bits(t *testing.T) {
 }
 
 
-
+func TestBitLitten(t *testing.T) {
+	var b [8]byte
+	binary.BigEndian.PutUint64(b[:],189234)
+	fmt.Println(b)
+	file,err := os.OpenFile(`d:\1.bin`,int(FMCreate),0660)
+	if err==nil{
+		file.Write(b[:])
+		file.Close()
+	}
+}
 
 func TestGFileStream_Read(t *testing.T) {
 	stream,_ := NewFileStream(`E:\Delphi\Controls\UI\Skin\DXScene v4.42\dx_vgcore.pas`,FMOpenRead,4096)
