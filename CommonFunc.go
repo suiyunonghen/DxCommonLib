@@ -6,18 +6,18 @@ QQ:75492895
 package DxCommonLib
 
 import (
+	"bytes"
+	"encoding/binary"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
-	"bytes"
 	"io/ioutil"
-	"unsafe"
 	"os"
-	"time"
-	"strconv"
-	"unicode/utf16"
-	"encoding/binary"
 	"reflect"
 	"runtime"
+	"strconv"
+	"time"
+	"unicode/utf16"
+	"unsafe"
 )
 
 type(

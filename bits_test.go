@@ -42,7 +42,6 @@ func TestTDxBits_Bits(t *testing.T) {
 
 func TestBitLitten(t *testing.T) {
 	var b [8]byte
-	fmt.println("Asdf")
 	binary.BigEndian.PutUint64(b[:],189234)
 	fmt.Println(b)
 	file,err := os.OpenFile(`d:\1.bin`,int(FMCreate),0660)
