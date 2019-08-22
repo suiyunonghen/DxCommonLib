@@ -1,4 +1,4 @@
-module DxCommonLib
+module github.com/suiyunonghen/DxCommonLib
 
 go 1.12
 
