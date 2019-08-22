@@ -1,4 +1,4 @@
-module dxcommonlib
+module DxCommonLib
 
 go 1.12
 
