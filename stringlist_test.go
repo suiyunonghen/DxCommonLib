@@ -2,7 +2,9 @@ package DxCommonLib
 
 import (
 	"fmt"
+	"syscall"
 	"testing"
+	"unsafe"
 )
 
 func TestStringList(t *testing.T) {
@@ -27,3 +29,8 @@ func TestStringList(t *testing.T) {
 	fmt.Println(lst.IndexOfName("Age"))
 }
 
+func TestStringFromUtf8Pointer(t *testing.T) {
+	str := "不得闲测试"
+	utf16ptr,_ := syscall.UTF16PtrFromString(str)
+	fmt.Println(StringFromUtf16Pointer(uintptr(unsafe.Pointer(utf16ptr)),1024))
+}

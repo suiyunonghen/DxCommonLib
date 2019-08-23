@@ -161,6 +161,35 @@ func Pchar2String(pcharstr uintptr)string  {
 	return string(utf16.Decode(gbt))
 }
 
+func StringFromUtf8Pointer(utf8Addr uintptr,maxlen int)string  {
+	if utf8Addr == 0 {
+		return ""
+	}
+	for i := 0; i< maxlen;i++{
+		mb := (*byte)(unsafe.Pointer(uintptr(uint(utf8Addr)+uint(i))))
+		if *mb==0{
+			resultb := make([]byte,i)
+			CopyMemory(unsafe.Pointer(&resultb[0]),unsafe.Pointer(utf8Addr),uintptr(i))
+			return string(resultb)
+		}
+	}
+	return ""
+}
+
+func StringFromUtf16Pointer(utf16Addr uintptr,maxlen int)string  {
+	if utf16Addr == 0 {
+		return ""
+	}
+	for i := 0; i< maxlen;i++{
+		mb := (*uint16)(unsafe.Pointer(uintptr(uint(utf16Addr)+uint(i*2))))
+		if *mb==0{
+			resultb := make([]uint16,i)
+			CopyMemory(unsafe.Pointer(&resultb[0]),unsafe.Pointer(utf16Addr),uintptr(i*2))
+			return string(utf16.Decode(resultb))
+		}
+	}
+	return ""
+}
 
 func FastPchar2String(pcharstr uintptr)string  {
 	if pcharstr==0{
