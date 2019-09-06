@@ -177,6 +177,48 @@ func (lst *GStringList) LoadFromFile(fileName string) {
 	}
 }
 
+func (lst *GStringList)LoadFromReader(r io.Reader,filecodeType FileCodeMode)  {
+	lst.Clear()
+	reader := bufio.NewReader(r)
+	for{
+		line,err := reader.ReadBytes('\n')
+		if filecodeType == File_Code_Utf16LE{ //小端结尾多一个空白的0标记
+			reader.ReadByte()
+		}
+		if err == nil || err == io.EOF{
+			linelen := len(line)
+			if linelen >= 2{
+				if line[linelen-2] == '\r'{
+					line = line[:linelen - 2]
+				}else if line[linelen - 1] == '\n'{
+					line = line[:linelen-1]
+				}
+			}
+			if linelen>0{
+				switch filecodeType {
+				case File_Code_Utf8:
+					lst.Add(FastByte2String(line))
+				case File_Code_Utf16LE,File_Code_Utf16BE:
+					lst.Add(UTF16Byte2string(line,filecodeType == File_Code_Utf16BE))
+				case File_Code_GBK,File_Code_Unknown:
+					if tmpbytes, err := GBK2Utf8(line); err == nil {
+						lst.Add(FastByte2String(tmpbytes))
+					}else{
+						lst.Add(FastByte2String(line))
+					}
+				}
+			}else{
+				lst.Add("")
+			}
+			if err != nil{
+				return
+			}
+		}else{
+			return
+		}
+	}
+}
+
 func (lst *GStringList) SaveToFile(fileName string) {
 	//文件要先写入UTF8的BOM
 	if file, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC, 0644); err == nil {

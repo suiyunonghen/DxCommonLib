@@ -105,6 +105,10 @@ func (worker *TimeWheelWorker) Stop() {
 	close(worker.quitchan)
 }
 
+func (worker *TimeWheelWorker)Done()<-chan struct{}  {
+	return worker.quitchan
+}
+
 func (worker *TimeWheelWorker)getRecord(wheelcount int)*slotRecord  {
 	var result *slotRecord
 	v := worker.recordPool.Get()
