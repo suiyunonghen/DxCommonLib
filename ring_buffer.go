@@ -193,7 +193,7 @@ func (buffer *DxRingBuffer)malloc(cap int)  {
 	if newcap < 256{
 		newcap = newcap * 2
 	}else if newcap < 512{
-		newcap = 512
+		newcap = newcap + 256
 	}else {
 		newcap = newcap + 512
 	}
