@@ -515,10 +515,10 @@ func ParserEscapeStr(bvalue []byte)string {
 				buf.WriteByte('"')
 			case 'b':
 				buf.WriteByte('\b')
-				/*case '\'':
-					buf.WriteByte('\'')
-				case '/':
-					buf.WriteByte('/')*/
+			case '\'':
+				buf.WriteByte('\'')
+			case '/':
+				buf.WriteByte('/')
 			case 'u':
 				escapeType = 2 // unicode decode
 				unicodeidx = i
