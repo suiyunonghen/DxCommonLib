@@ -105,10 +105,6 @@ func (worker *TimeWheelWorker) Stop() {
 	close(worker.quitchan)
 }
 
-func (worker *TimeWheelWorker)Done()<-chan struct{}  {
-	return worker.quitchan
-}
-
 func (worker *TimeWheelWorker)getRecord(wheelcount int)*slotRecord  {
 	var result *slotRecord
 	v := worker.recordPool.Get()
@@ -174,8 +170,9 @@ func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
 			rec = currec
 		}
 	}
+	notifychan := rec.notifychan
 	worker.Unlock()
-	return rec.notifychan
+	return notifychan
 }
 
 func (worker *TimeWheelWorker)AfterFunc(d time.Duration,afunc func())  {
