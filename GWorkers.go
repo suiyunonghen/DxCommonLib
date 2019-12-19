@@ -52,6 +52,12 @@ func (workers *GWorkers) Start() {
 	}
 	workers.fstopchan = make(chan struct{})
 	stopCh := workers.fstopchan
+	workers.workerChanPool.New = func() interface{} {
+		return &workerChan{
+			fOwner:workers,
+			fcurTask: make(chan ITaskRunner, workerChanCap),
+		}
+	}
 	go func() {
 		var scratch []*workerChan
 		for {
@@ -78,8 +84,9 @@ func (workers *GWorkers) Stop() {
 	// serving the connection and noticing wp.mustStop = true.
 	workers.lock.Lock()
 	ready := workers.ready
-	for i, ch := range ready {
-		ch.fcurTask <- nil
+	l := len(ready)
+	for i:=0;i<l;i++{
+		ready[i].fcurTask <- nil
 		ready[i] = nil
 	}
 	workers.ready = ready[:0]
@@ -107,23 +114,33 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 
 	// Clean least recently used workers if they didn't serve connections
 	// for more than maxIdleWorkerDuration.
-	currentTime := time.Now()
+	criticalTime := time.Now().Add(-maxIdleWorkerDuration)
 	workers.lock.Lock()
 	ready := workers.ready
 	n := len(ready)
-	i := 0
 	//超过设定的最大空闲时间的，就解雇掉
-	for i < n && currentTime.Sub(ready[i].lastUseTime) > maxIdleWorkerDuration {
-		i++
-	}
-	*scratch = append((*scratch)[:0], ready[:i]...)
-	if i > 0 {
-		m := copy(ready, ready[i:])
-		for i = m; i < n; i++ {
-			ready[i] = nil
+	// Use binary-search algorithm to find out the index of the least recently worker which can be cleaned up.
+	l, r, mid := 0, n-1, 0
+	for l <= r {
+		mid = (l + r) / 2
+		if criticalTime.After(workers.ready[mid].lastUseTime) {
+			l = mid + 1
+		} else {
+			r = mid - 1
 		}
-		workers.ready = ready[:m]
 	}
+	i := r
+	if i == -1 {
+		workers.lock.Unlock()
+		return
+	}
+
+	*scratch = append((*scratch)[:0], ready[:i+1]...)
+	m := copy(ready, ready[i+1:])
+	for i = m; i < n; i++ {
+		ready[i] = nil
+	}
+	workers.ready = ready[:m]
 	workers.lock.Unlock()
 
 	// Notify obsolete workers to stop.
@@ -131,8 +148,9 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 	// may be blocking and may consume a lot of time if many workers
 	// are located on non-local CPUs.
 	tmp := *scratch
-	for i, ch := range tmp {
-		ch.fcurTask <- nil
+	l = len(tmp)
+	for i:=0;i< l;i++{
+		tmp[i].fcurTask <- nil
 		tmp[i] = nil
 	}
 }
@@ -161,12 +179,6 @@ func (workers *GWorkers) getCh() *workerChan {
 			return nil
 		}
 		vch := workers.workerChanPool.Get()
-		if vch == nil {
-			vch = &workerChan{
-				fOwner:workers,
-				fcurTask: make(chan ITaskRunner, workerChanCap),
-			}
-		}
 		ch = vch.(*workerChan)
 		go func() {
 			workers.workerFunc(ch)
