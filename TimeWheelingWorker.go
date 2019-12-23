@@ -215,10 +215,10 @@ func ReSetDefaultTimeWheel(Chkinterval time.Duration,slotBlockCount int){
 
 func init()  {
 	defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200, func() {
-		t := time.Now().Truncate(time.Millisecond*500)
+		t := time.Now().Truncate(time.Millisecond*50)
 		coarseTime.Store(&t)
 	})
-	t := time.Now().Truncate(time.Millisecond*500)
+	t := time.Now().Truncate(time.Millisecond*50)
 	coarseTime.Store(&t)
 }
 
