@@ -278,7 +278,7 @@ func NewWorkers(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)
 
 var defWorkers *GWorkers
 
-func ResetDefault(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)  {
+func ResetDefaultWorker(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)  {
 	if defWorkers != nil{
 		defWorkers.Stop()
 	}
