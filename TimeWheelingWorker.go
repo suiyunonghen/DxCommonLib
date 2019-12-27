@@ -11,9 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 )
-
+const(
+	minTickerInterval = time.Millisecond*2
+)
 type (
-
 	//每个槽中的记录对象
 	slotRecord struct {
 		curWheelIndex		int			//当前轮询的索引
@@ -45,6 +46,9 @@ var (
 //interval指定调度的时间间隔
 //slotBlockCount指定时间轮的块长度
 func NewTimeWheelWorker(interval time.Duration, slotBlockCount int,tkfunc func()) *TimeWheelWorker {
+	if interval < minTickerInterval{
+		interval = minTickerInterval
+	}
 	result := new(TimeWheelWorker)
 	result.interval = interval
 	result.quitchan = make(chan struct{})
@@ -202,6 +206,9 @@ func Sleep(d time.Duration) {
 }
 
 func ReSetDefaultTimeWheel(Chkinterval time.Duration,slotBlockCount int){
+	if Chkinterval < minTickerInterval{
+		Chkinterval = minTickerInterval
+	}
 	if defaultTimeWheelWorker.interval != Chkinterval  ||
 		defaultTimeWheelWorker.slockcount != slotBlockCount{
 			defaultTimeWheelWorker.Stop()
