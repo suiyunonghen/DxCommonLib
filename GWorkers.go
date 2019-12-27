@@ -296,7 +296,7 @@ func TryPostAndRun(routineFunc GWorkerFunc,params ...interface{})bool  {
 	if defWorkers == nil{
 		defWorkers = NewWorkers(0,0)
 	}
-	defWorkers.TryPostAndRun(routineFunc,params...)
+	return defWorkers.TryPostAndRun(routineFunc,params...)
 }
 
 //必须异步执行到
