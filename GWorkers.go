@@ -216,27 +216,45 @@ func (workers *GWorkers) workerFunc(ch *workerChan) {
 			break
 		}
 	}
-
 	workers.lock.Lock()
 	workers.workersCount--
 	workers.lock.Unlock()
 }
 
-func (workers *GWorkers)PostFunc(routineFunc GWorkerFunc,params ...interface{})  {
+func (workers *GWorkers)PostFunc(routineFunc GWorkerFunc,params ...interface{})bool  {
 	wch := workers.getCh()
 	if wch != nil {
 		taskrunner := workers.deftaskrunnerPool.Get().(*defTaskRunner)
 		taskrunner.runfunc = routineFunc
 		taskrunner.runargs = params
 		wch.fcurTask <- taskrunner
+		return true
+	}
+	return false
+}
+
+//必须异步执行到
+func (workers *GWorkers)MustRunAsync(routineFunc GWorkerFunc,params ...interface{})  {
+	for !workers.PostFunc(routineFunc,params...){
+		runtime.Gosched()
 	}
 }
 
-func (workers *GWorkers)Post(runner ITaskRunner)  {
+func (workers *GWorkers)TryPostAndRun(routineFunc GWorkerFunc,params ...interface{})bool  {
+	if workers.PostFunc(routineFunc,params...){
+		return true
+	}
+	routineFunc(params...)
+	return false
+}
+
+func (workers *GWorkers)Post(runner ITaskRunner)bool  {
 	wch := workers.getCh()
 	if wch != nil {
 		wch.fcurTask <- runner
+		return true
 	}
+	return false
 }
 
 func NewWorkers(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration) *GWorkers {
@@ -245,12 +263,12 @@ func NewWorkers(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)
 		return new(defTaskRunner)
 	}
 	if maxGoroutinesAmount <= 0 {
-		gp.fMaxWorkersCount = 256 * 1024
+		gp.fMaxWorkersCount = 512 * 1024
 	} else {
 		gp.fMaxWorkersCount = maxGoroutinesAmount
 	}
 	if maxGoroutineIdleDuration <= 0 {
-		gp.fMaxWorkerIdleTime = 15 * time.Second
+		gp.fMaxWorkerIdleTime = 10 * time.Second
 	} else {
 		gp.fMaxWorkerIdleTime = maxGoroutineIdleDuration
 	}
@@ -260,11 +278,33 @@ func NewWorkers(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)
 
 var defWorkers *GWorkers
 
-func PostFunc(routineFunc GWorkerFunc,params ...interface{})  {
+func ResetDefault(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)  {
+	if defWorkers != nil{
+		defWorkers.Stop()
+	}
+	defWorkers = NewWorkers(maxGoroutinesAmount,maxGoroutineIdleDuration)
+}
+
+func PostFunc(routineFunc GWorkerFunc,params ...interface{})bool  {
 	if defWorkers == nil{
 		defWorkers = NewWorkers(0,0)
 	}
-	defWorkers.PostFunc(routineFunc,params...)
+	return defWorkers.PostFunc(routineFunc,params...)
+}
+
+func TryPostAndRun(routineFunc GWorkerFunc,params ...interface{})bool  {
+	if defWorkers == nil{
+		defWorkers = NewWorkers(0,0)
+	}
+	defWorkers.TryPostAndRun(routineFunc,params...)
+}
+
+//必须异步执行到
+func MustRunAsync(routineFunc GWorkerFunc,params ...interface{})  {
+	if defWorkers == nil{
+		defWorkers = NewWorkers(0,0)
+	}
+	defWorkers.MustRunAsync(routineFunc,params...)
 }
 
 func Post(runner ITaskRunner)  {
