@@ -11,33 +11,15 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 	"io/ioutil"
+	"math"
 	"os"
 	"reflect"
-	"runtime"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf16"
 	"unsafe"
 )
-
-type(
-	TDateTime  float64
-)
-
-const (
-	MinsPerHour = 60
-	MinsPerDay = 24 * MinsPerHour
-	SecsPerDay = MinsPerDay * 60
-	MSecsPerDay = SecsPerDay * 1000
-)
-var (
-	delphiFirstTime time.Time
-	IsAmd64 = runtime.GOARCH == "amd64"
-)
-
-func init() {
-	delphiFirstTime = time.Date(1899,12,30,0,0,0,0,time.Local)
-}
 
 //内存拷贝函数
 //go:linkname CopyMemory runtime.memmove
@@ -66,32 +48,6 @@ func ZeroByteSlice(bt []byte)  {
 	if btlen > 0{
 		ZeroMemory(unsafe.Pointer(&bt[0]),uintptr(btlen))
 	}
-}
-
-/*
-从Delphi日期转为Go日期格式
-Delphi的日期规则为到1899-12-30号的天数+当前的毫秒数/一天的总共毫秒数集合
- */
-func (date TDateTime)ToTime()time.Time  {
-	mDay := time.Duration(date)
-	ms := (date - TDateTime(mDay)) * TDateTime(MSecsPerDay)
-	return delphiFirstTime.Add(mDay*time.Hour*24 + time.Duration(ms)*time.Millisecond)
-}
-
-func (date *TDateTime)WrapTime2Self(t time.Time)  {
-	days := t.Sub(delphiFirstTime) / (time.Hour * 24)
-	y,m,d := t.Date()
-	nowdate := time.Date(y,m,d,0,0,0,0,time.Local)
-	times := float64(t.Sub(nowdate))/float64(time.Hour*24)
-	*date = TDateTime(float64(days) + times)
-}
-
-func Time2DelphiTime(t *time.Time)TDateTime  {
-	days := t.Sub(delphiFirstTime) / (time.Hour * 24)
-	y,m,d := t.Date()
-	nowdate := time.Date(y,m,d,0,0,0,0,time.Local)
-	times := float64(t.Sub(nowdate))/float64(time.Hour*24)
-	return TDateTime(float64(days) + times)
 }
 
 func Ord(b bool)byte  {
@@ -230,8 +186,6 @@ func FastDelphiPchar2String(pcharstr uintptr)string  {
 	return string(utf16.Decode(*(*[] uint16)(unsafe.Pointer(s))))
 }
 
-
-
 func FastBytes2Uint16s(bt []byte)[]uint16  {
 	sliceHead := (*reflect.SliceHeader)(unsafe.Pointer(&bt))
 	sliceHead.Len = sliceHead.Len / 2
@@ -241,6 +195,7 @@ func FastBytes2Uint16s(bt []byte)[]uint16  {
 
 //本函数只作为强制转换使用，不可将返回的Slice再做修改处理
 func FastString2Byte(str string)[]byte  {
+	//return []byte(str)
 	strHead := (*reflect.StringHeader)(unsafe.Pointer(&str))
 	var sliceHead reflect.SliceHeader
 	sliceHead.Len = strHead.Len
@@ -250,6 +205,7 @@ func FastString2Byte(str string)[]byte  {
 }
 
 func FastByte2String(bt []byte)string  {
+	//return string(bt)
 	return *(*string)(unsafe.Pointer(&bt))
 }
 
@@ -367,69 +323,8 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	return
 }
 
-//Date(1402384458000)
-//Date(1224043200000+0800)
-func ParserJsonTime(jsontime string)TDateTime  {
-	bt := FastString2Byte(jsontime)
-	dtflaglen := 0
-	endlen := 0
-	if  bytes.HasPrefix(bt,[]byte{'D','a','t','e','('}) && bytes.HasSuffix(bt,[]byte{')'}){
-		dtflaglen = 5
-		endlen = 1
-	}else if bytes.HasPrefix(bt,[]byte{'/','D','a','t','e','('}) && bytes.HasSuffix(bt,[]byte{')','/'}){
-		dtflaglen = 6
-		endlen = 2
-	}
-	if dtflaglen > 0{
-		bt = bt[dtflaglen:len(bt)-endlen]
-		var(
-			ms int64
-			err error
-		)
-		endlen = 0
-		idx := bytes.IndexByte(bt,'+')
-		if idx < 0{
-			idx = bytes.IndexByte(bt,'-')
-		}else{
-			endlen = 1
-		}
-		if idx < 0{
-			str := FastByte2String(bt[:])
-			if ms,err = strconv.ParseInt(str,10,64);err != nil{
-				return -1
-			}
-			if len(str) > 9{
-				ms = ms / 1000
-			}
-		}else{
-			if endlen == 0{
-				endlen = -1
-			}
-			str := FastByte2String(bt[:idx])
-			ms,err = strconv.ParseInt(str,10,64)
-			if err != nil{
-				return -1
-			}
-			bt = bt[idx+1:]
-			if len(bt) < 2{
-				return -1
-			}
-			bt = bt[:2]
-			ctz,err := strconv.Atoi(FastByte2String(bt))
-			if err != nil{
-				return -1
-			}
-			if len(str) > 9{
-				ms = ms / 1000
-			}
-			ms += int64(ctz * 60)
-		}
-		ntime := time.Now()
-		ns := ntime.Unix()
-		ntime = ntime.Add((time.Duration(ms - ns)*time.Second))
-		return Time2DelphiTime(&ntime)
-	}
-	return -1
+func ParserJson2GoTime()  {
+
 }
 
 //将内容转义成Json字符串
@@ -585,6 +480,70 @@ func ParserEscapeStr(bvalue []byte)string {
 	return FastByte2String(buf.Bytes())
 }
 
+//Date(1402384458000)
+//Date(1224043200000+0800)
+func ParserJsonTime2Go(jsontime string)time.Time  {
+	bt := FastString2Byte(jsontime)
+	dtflaglen := 0
+	endlen := 0
+	if  bytes.HasPrefix(bt,[]byte{'D','a','t','e','('}) && bytes.HasSuffix(bt,[]byte{')'}){
+		dtflaglen = 5
+		endlen = 1
+	}else if bytes.HasPrefix(bt,[]byte{'/','D','a','t','e','('}) && bytes.HasSuffix(bt,[]byte{')','/'}){
+		dtflaglen = 6
+		endlen = 2
+	}
+	if dtflaglen > 0{
+		bt = bt[dtflaglen:len(bt)-endlen]
+		var(
+			ms int64
+			err error
+		)
+		endlen = 0
+		idx := bytes.IndexByte(bt,'+')
+		if idx < 0{
+			idx = bytes.IndexByte(bt,'-')
+		}else{
+			endlen = 1
+		}
+		if idx < 0{
+			str := FastByte2String(bt[:])
+			if ms,err = strconv.ParseInt(str,10,64);err != nil{
+				return time.Time{}
+			}
+			if len(str) > 9{
+				ms = ms / 1000
+			}
+		}else{
+			if endlen == 0{
+				endlen = -1
+			}
+			str := FastByte2String(bt[:idx])
+			ms,err = strconv.ParseInt(str,10,64)
+			if err != nil{
+				return time.Time{}
+			}
+			bt = bt[idx+1:]
+			if len(bt) < 2{
+				return time.Time{}
+			}
+			bt = bt[:2]
+			ctz,err := strconv.Atoi(FastByte2String(bt))
+			if err != nil{
+				return time.Time{}
+			}
+			if len(str) > 9{
+				ms = ms / 1000
+			}
+			ms += int64(ctz * 60)
+		}
+		ntime := time.Now()
+		ns := ntime.Unix()
+		ntime = ntime.Add((time.Duration(ms - ns)*time.Second))
+		return ntime
+	}
+	return time.Time{}
+}
 
 //2进制转到16进制
 func Binary2Hex(bt []byte)string  {
@@ -612,4 +571,218 @@ func Hex2Binary(hexStr string)[]byte  {
 		jidx++
 	}
 	return result
+}
+
+//From github.com/valyala/fastjson/tree/master/fastfloat
+func StrToIntDef(vstr string,defv int64)int64  {
+	vlen := uint(len(vstr))
+	if vlen == 0 {
+		return defv
+	}
+	if vlen > 18{
+		if dd, err := strconv.ParseInt(vstr, 10, 64);err!=nil{
+			return defv
+		}else{
+			return dd
+		}
+	}
+	i := uint(0)
+	hasNegativeNum := vstr[0] == '-'
+	if hasNegativeNum {
+		i++
+		if i >= vlen {
+			return defv
+		}
+	}
+	d := int64(0)
+	j := i
+	for i < vlen {
+		if vstr[i] >= '0' && vstr[i] <= '9' {
+			d = d*10 + int64(vstr[i]-'0')
+			i++
+			continue
+		}
+		break
+	}
+	if i <= j || i < vlen {
+		return defv
+	}
+	if hasNegativeNum {
+		d = -d
+	}
+	return d
+}
+//From github.com/valyala/fastjson/tree/master/fastfloat
+func StrToUintDef(vstr string,defv uint64)uint64 {
+	vlen := uint(len(vstr))
+	if vlen == 0 {
+		return defv
+	}
+	if vlen > 18{
+		if dd, err := strconv.ParseUint(vstr, 10, 64);err != nil {
+			return defv
+		}else{
+			return dd
+		}
+	}
+	i := uint(0)
+	d := uint64(0)
+	j := i
+	for i < vlen {
+		if vstr[i] >= '0' && vstr[i] <= '9' {
+			d = d*10 + uint64(vstr[i]-'0')
+			i++
+			continue
+		}
+		break
+	}
+	if i <= j || i < vlen {
+		return defv
+	}
+	return d
+}
+
+var (
+	inf = math.Inf(1)
+	nan = math.NaN()
+)
+//github.com/valyala/fastjson/tree/master/fastfloat
+func StrToFloatDef(s string,defv float64) float64 {
+	vlen := uint(len(s))
+	if vlen == 0 {
+		return defv
+	}
+	i := uint(0)
+	minus := s[0] == '-'
+	if minus {
+		i++
+		if i >= vlen {
+			return defv
+		}
+	}
+	d := uint64(0)
+	j := i
+	for i < uint(len(s)) {
+		if s[i] >= '0' && s[i] <= '9' {
+			d = d*10 + uint64(s[i]-'0')
+			i++
+			if i > 18 {
+				// The integer part may be out of range for uint64.
+				// Fall back to slow parsing.
+				f, err := strconv.ParseFloat(s, 64)
+				if err != nil && !math.IsInf(f, 0) {
+					return defv
+				}
+				return f
+			}
+			continue
+		}
+		break
+	}
+	if i <= j {
+		if strings.EqualFold(s[i:], "inf") {
+			if minus {
+				return -inf
+			}
+			return inf
+		}
+		if strings.EqualFold(s[i:], "nan") {
+			return nan
+		}
+		return defv
+	}
+	f := float64(d)
+	if i >= uint(len(s)) {
+		// Fast path - just integer.
+		if minus {
+			f = -f
+		}
+		return f
+	}
+
+	if s[i] == '.' {
+		// Parse fractional part.
+		i++
+		if i >= uint(len(s)) {
+			return defv
+		}
+		fr := uint64(0)
+		j := i
+		for i < uint(len(s)) {
+			if s[i] >= '0' && s[i] <= '9' {
+				fr = fr*10 + uint64(s[i]-'0')
+				i++
+				if i-j > 18 {
+					// The fractional part may be out of range for uint64.
+					// Fall back to standard parsing.
+					f, err := strconv.ParseFloat(s, 64)
+					if err != nil && !math.IsInf(f, 0) {
+						return defv
+					}
+					return f
+				}
+				continue
+			}
+			break
+		}
+		if i <= j {
+			return defv
+		}
+		f += float64(fr) / math.Pow10(int(i-j))
+		if i >= uint(len(s)) {
+			// Fast path - parsed fractional number.
+			if minus {
+				f = -f
+			}
+			return f
+		}
+	}
+	if s[i] == 'e' || s[i] == 'E' {
+		// Parse exponent part.
+		i++
+		if i >= uint(len(s)) {
+			return defv
+		}
+		expMinus := false
+		if s[i] == '+' || s[i] == '-' {
+			expMinus = s[i] == '-'
+			i++
+			if i >= uint(len(s)) {
+				return defv
+			}
+		}
+		exp := int16(0)
+		j := i
+		for i < uint(len(s)) {
+			if s[i] >= '0' && s[i] <= '9' {
+				exp = exp*10 + int16(s[i]-'0')
+				i++
+				if exp > 300 {
+					// The exponent may be too big for float64.
+					// Fall back to standard parsing.
+					f, err := strconv.ParseFloat(s, 64)
+					if err != nil && !math.IsInf(f, 0) {
+						return defv
+					}
+					return f
+				}
+				continue
+			}
+			break
+		}
+		if i <= j {
+			return defv
+		}
+		if expMinus {
+			exp = -exp
+		}
+		f *= math.Pow10(int(exp))
+		if i >= uint(len(s)) {
+			if minus {
+				f = -f
+			}
+			return f
+		}
+	}
+	return defv
 }

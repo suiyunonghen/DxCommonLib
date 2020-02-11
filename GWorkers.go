@@ -235,9 +235,13 @@ func (workers *GWorkers)PostFunc(routineFunc GWorkerFunc,params ...interface{})b
 
 //必须异步执行到
 func (workers *GWorkers)MustRunAsync(routineFunc GWorkerFunc,params ...interface{})  {
-	for !workers.PostFunc(routineFunc,params...){
+	for idx := 0;idx<=4;idx++{
+		if workers.PostFunc(routineFunc,params...){
+			return
+		}
 		runtime.Gosched()
 	}
+	go routineFunc(params...)
 }
 
 func (workers *GWorkers)TryPostAndRun(routineFunc GWorkerFunc,params ...interface{})bool  {
