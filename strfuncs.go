@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 	"unicode/utf16"
+	"unicode/utf8"
 	"unsafe"
 )
 
@@ -195,7 +196,6 @@ func FastBytes2Uint16s(bt []byte)[]uint16  {
 
 //本函数只作为强制转换使用，不可将返回的Slice再做修改处理
 func FastString2Byte(str string)[]byte  {
-	//return []byte(str)
 	strHead := (*reflect.StringHeader)(unsafe.Pointer(&str))
 	var sliceHead reflect.SliceHeader
 	sliceHead.Len = strHead.Len
@@ -205,7 +205,6 @@ func FastString2Byte(str string)[]byte  {
 }
 
 func FastByte2String(bt []byte)string  {
-	//return string(bt)
 	return *(*string)(unsafe.Pointer(&bt))
 }
 
@@ -323,103 +322,96 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	return
 }
 
-func ParserJson2GoTime()  {
-
-}
 
 //将内容转义成Json字符串
 func EscapeJsonStr(str string) string {
-	var buf bytes.Buffer
+	return FastByte2String(EscapeJsonbyte(str,nil))
+}
+
+func EscapeJsonbyte(str string,dst []byte) []byte {
+	dstlen := len(dst)
+	strlen := len(str)
+	if dstlen == 0{
+		dst = make([]byte,0,strlen * 2)
+	}
 	for _,runedata := range str{
 		switch runedata {
-		case '\t':
-			buf.WriteByte('\\')
-			buf.WriteByte('t')
-		case '\f':
-			buf.WriteByte('\\')
-			buf.WriteByte('f')
-		case '\r':
-			buf.WriteByte('\\')
-			buf.WriteByte('r')
-		case '\n':
-			buf.WriteByte('\\')
-			buf.WriteByte('n')
-		case '\\':
-			buf.WriteByte('\\')
-			buf.WriteByte('\\')
-		case '"':
-			buf.WriteByte('\\')
-			buf.WriteByte('"')
+		case '\a':
+			dst = append(dst, '\\','a')
 		case '\b':
-			buf.WriteByte('\\')
-			buf.WriteByte('b')
-			/*case '\'':
-				buf.WriteByte('\\')
-				buf.WriteByte('\'')
-			case '/':
-				buf.WriteByte('\\')
-				buf.WriteByte('/')*/
+			dst = append(dst, '\\','b')
+		case '\f':
+			dst = append(dst, '\\','f')
+		case '\n':
+			dst = append(dst, '\\','n')
+		case '\r':
+			dst = append(dst, '\\','r')
+		case '\t':
+			dst = append(dst, '\\','t')
+		case '\v':
+			dst = append(dst, '\\','v')
 		default:
-			if runedata < 256{
-				buf.WriteByte(byte(runedata))
-			}else{
-				buf.Write([]byte{'\\','u'})
-				var b [4]byte
-				binary.BigEndian.PutUint32(b[:],uint32(runedata))
-				if b[0]==0 && b[1] == 0{
-					hexstr := Binary2Hex(b[2:])
-					buf.WriteString(hexstr)
-				}else{
-					hexstr := Binary2Hex(b[0:2])
-					buf.WriteString(hexstr)
-					buf.Write([]byte{'\\','u'})
-					hexstr = Binary2Hex(b[2:])
-					buf.WriteString(hexstr)
+			switch {
+			case runedata < utf8.RuneSelf:
+				dst = append(dst,byte(runedata))
+			case runedata < ' ':
+				dst = append(dst, '\\','x')
+				dst = append(dst, vhex[byte(runedata)>>4],vhex[byte(runedata)&0xF])
+			case runedata > utf8.MaxRune:
+				runedata = 0xFFFD
+				fallthrough
+			case runedata < 0x10000:
+				dst = append(dst, `\u`...)
+				for s := 12; s >= 0; s -= 4 {
+					dst = append(dst, vhex[runedata>>uint(s)&0xF])
+				}
+			default:
+				dst = append(dst, `\U`...)
+				for s := 28; s >= 0; s -= 4 {
+					dst = append(dst, vhex[runedata>>uint(s)&0xF])
 				}
 			}
 		}
 	}
-	return FastByte2String(buf.Bytes())
+	return dst
 }
 
-//解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
-func ParserEscapeStr(bvalue []byte)string {
+func UnEscapeStr(bvalue []byte)[]byte {
+	buf := make([]byte,0,256)
 	blen := len(bvalue)
 	i := 0
-	//IsInUnicode := false
 	unicodeidx := 0
-	//escapein := false
 	escapeType := uint8(0)  //0 normal,1 json\escapin,2 unicode escape, 3 % url escape
-	var buf bytes.Buffer
 	for i < blen{
 		switch escapeType {
 		case 1://json escapin
 			escapeType = 0
 			switch bvalue[i] {
 			case 't':
-				buf.WriteByte('\t')
+				buf = append(buf,'\t')
 			case 'f':
-				buf.WriteByte('\f')
+				buf = append(buf,'\f')
 			case 'r':
-				buf.WriteByte('\r')
+				buf = append(buf,'\r')
 			case 'n':
-				buf.WriteByte('\n')
+				buf = append(buf,'\n')
 			case '\\':
-				buf.WriteByte('\\')
+				buf = append(buf,'\\')
 			case '"':
-				buf.WriteByte('"')
+				buf = append(buf,'"')
+			case 'a':
+				buf = append(buf,'\a')
 			case 'b':
-				buf.WriteByte('\b')
+				buf = append(buf,'\b')
 			case '\'':
-				buf.WriteByte('\'')
+				buf = append(buf,'\'')
 			case '/':
-				buf.WriteByte('/')
+				buf = append(buf,'/')
 			case 'u':
 				escapeType = 2 // unicode decode
 				unicodeidx = i
 			default:
-				buf.WriteByte('\\')
-				buf.WriteByte(bvalue[i])
+				buf = append(buf,'\\',bvalue[i])
 			}
 		case 2: //unicode decode
 			if (bvalue[i]>='0' && bvalue[i] <= '9' || bvalue[i] >='a' && bvalue[i] <= 'f' ||
@@ -429,9 +421,12 @@ func ParserEscapeStr(bvalue []byte)string {
 			}else{
 				unicodestr := FastByte2String(bvalue[unicodeidx+1:i])
 				if arune,err := strconv.ParseInt(unicodestr,16,32);err==nil{
-					buf.WriteRune(rune(arune))
+					l := len(buf)
+					buf = append(buf,0,0,0,0)
+					runelen := utf8.EncodeRune(buf[l:l+4],rune(arune))
+					buf = buf[:l+runelen]
 				}else{
-					buf.Write(bvalue[unicodeidx:i])
+					buf = append(buf,bvalue[unicodeidx:i]...)
 				}
 				escapeType = 0
 				continue
@@ -445,9 +440,9 @@ func ParserEscapeStr(bvalue []byte)string {
 				}else{
 					bytestr := FastByte2String(bvalue[i:i+j])
 					if abyte,err := strconv.ParseInt(bytestr,16,32);err==nil{
-						buf.WriteByte(byte(abyte))
+						buf = append(buf,byte(abyte))
 					}else{
-						buf.Write(bvalue[i-1:i+j]) //%要加上
+						buf = append(buf,bvalue[i-1:i+j]...)//%要加上
 					}
 					escapeType = 0
 					i += j - 1
@@ -461,23 +456,32 @@ func ParserEscapeStr(bvalue []byte)string {
 			case '%':
 				escapeType = 3 // url escape
 			default:
-				buf.WriteByte(bvalue[i])
+				buf = append(buf,bvalue[i])
 			}
 		}
 		i++
 	}
 	switch escapeType {
 	case 1:
-		buf.WriteByte('\\')
+		buf = append(buf,'\\')
 	case 2:
 		unicodestr := FastByte2String(bvalue[unicodeidx+1:i])
 		if arune,err := strconv.ParseInt(unicodestr,16,32);err==nil{
-			buf.WriteRune(rune(arune))
+			l := len(buf)
+			buf = append(buf,0,0,0,0)
+			runelen := utf8.EncodeRune(buf[l:l+4],rune(arune))
+			buf = buf[:l+runelen]
 		}else{
-			buf.Write(bvalue[unicodeidx:i])
+			buf = append(buf,bvalue[unicodeidx:i]...)
 		}
 	}
-	return FastByte2String(buf.Bytes())
+	return buf
+}
+
+
+//解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
+func ParserEscapeStr(bvalue []byte)string {
+	return FastByte2String(UnEscapeStr(bvalue))
 }
 
 //Date(1402384458000)
@@ -545,15 +549,24 @@ func ParserJsonTime2Go(jsontime string)time.Time  {
 	return time.Time{}
 }
 
+var(
+	vhex = [16]byte{'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'}
+)
+
 //2进制转到16进制
-func Binary2Hex(bt []byte)string  {
-	var bf bytes.Buffer
-	vhex := [16]byte{'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'}
-	for _,vb := range bt{
-		bf.WriteByte(vhex[vb >> 4])
-		bf.WriteByte(vhex[vb & 0xF])
+func Binary2Hex(bt []byte,dst []byte)[]byte  {
+	l := len(dst)
+	if len(dst) == 0{
+		dst = make([]byte,0,l * 2)
 	}
-	return FastByte2String(bf.Bytes())
+	for _,vb := range bt{
+		dst = append(dst,vhex[vb >> 4],vhex[vb & 0xF])
+	}
+	return dst
+}
+
+func Bin2Hex(bt []byte)string  {
+	return FastByte2String(Binary2Hex(bt,nil))
 }
 
 //16进制到2进制
