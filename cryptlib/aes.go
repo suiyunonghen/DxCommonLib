@@ -52,7 +52,7 @@ func (aestool *AES)EncryptHex(key,value []byte)(string,error)  {
 	return  DxCommonLib.Bin2Hex(crypted),nil
 }
 
-func (aestool *AES)AESDecryptBase64(value,key string) string {
+func (aestool *AES)DecryptBase64(value,key string) string {
 	var realkey []byte
 	bt := []byte(key)
 	btlen := len(bt)
@@ -81,7 +81,7 @@ func (aestool *AES)AESDecryptBase64(value,key string) string {
 	return string(origData)
 }
 
-func (aestool *AES)AESDecryptWithHex(value,key string) string {
+func (aestool *AES)DecryptWithHex(value,key string) string {
 	var realkey []byte
 	bt := []byte(key)
 	btlen := len(bt)
