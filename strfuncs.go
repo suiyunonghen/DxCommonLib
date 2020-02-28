@@ -350,6 +350,12 @@ func EscapeJsonbyte(str string,dst []byte) []byte {
 			dst = append(dst, '\\','t')
 		case '\v':
 			dst = append(dst, '\\','v')
+		case '\\':
+			dst = append(dst, '\\','\\')
+		case '"':
+			dst = append(dst, '\\','"')
+		case '\'':
+			dst = append(dst, '\\','\'')
 		default:
 			switch {
 			case runedata < utf8.RuneSelf:
@@ -387,22 +393,24 @@ func UnEscapeStr(bvalue []byte)[]byte {
 		case 1://json escapin
 			escapeType = 0
 			switch bvalue[i] {
-			case 't':
-				buf = append(buf,'\t')
-			case 'f':
-				buf = append(buf,'\f')
-			case 'r':
-				buf = append(buf,'\r')
-			case 'n':
-				buf = append(buf,'\n')
-			case '\\':
-				buf = append(buf,'\\')
-			case '"':
-				buf = append(buf,'"')
 			case 'a':
 				buf = append(buf,'\a')
 			case 'b':
 				buf = append(buf,'\b')
+			case 'f':
+				buf = append(buf,'\f')
+			case 'n':
+				buf = append(buf,'\n')
+			case 'r':
+				buf = append(buf,'\r')
+			case 't':
+				buf = append(buf,'\t')
+			case 'v':
+				buf = append(buf,'\v')
+			case '\\':
+				buf = append(buf,'\\')
+			case '"':
+				buf = append(buf,'"')
 			case '\'':
 				buf = append(buf,'\'')
 			case '/':
