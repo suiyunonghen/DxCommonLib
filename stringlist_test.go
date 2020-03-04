@@ -7,7 +7,9 @@ import (
 	"unsafe"
 )
 
+
 func TestStringList(t *testing.T) {
+	fmt.Println(Ord(true),Ord(false))
 	var lst GStringList
 	for i := 0; i < 1000; i++ {
 		lst.Add("测试不得闲,adfadfadsfadf1")
@@ -31,6 +33,13 @@ func TestStringList(t *testing.T) {
 
 func TestStringFromUtf8Pointer(t *testing.T) {
 	str := "不得闲测试"
-	utf16ptr,_ := syscall.UTF16PtrFromString(str)
-	fmt.Println(StringFromUtf16Pointer(uintptr(unsafe.Pointer(utf16ptr)),1024))
+	utf16ptr, _ := syscall.UTF16PtrFromString(str)
+	fmt.Println(StringFromUtf16Pointer(uintptr(unsafe.Pointer(utf16ptr)), 1024))
+}
+
+func TestUnEscapeStr(t *testing.T) {
+	//http%3A%2F%2Fwww.dxsoft.com%3Fgg%3D%E4%B8%8D%E5%BE%97%E9%97%B2
+	//://
+	str := "%3B"
+	fmt.Println(FastByte2String(UnEscapeStr([]byte(str))))
 }

@@ -36,6 +36,13 @@ func memequal(a, b unsafe.Pointer, size uintptr)bool
 //go:linkname memequal_varlen runtime.memequal_varlen
 func memequal_varlen(a, b unsafe.Pointer)bool
 
+func Ord(x bool) uint8 {
+	// Avoid branches. In the SSA compiler, this compiles to
+	// exactly what you would want it to.
+	return *(*uint8)(unsafe.Pointer(&x))
+}
+
+
 //内存比较函数
 func CompareMem(a,b unsafe.Pointer,size int)bool  {
 	if size <= 0{
@@ -49,13 +56,6 @@ func ZeroByteSlice(bt []byte)  {
 	if btlen > 0{
 		ZeroMemory(unsafe.Pointer(&bt[0]),uintptr(btlen))
 	}
-}
-
-func Ord(b bool)byte  {
-	if b{
-		return 1
-	}
-	return 0
 }
 
 func GBKString(str string)([]byte,error)  {
@@ -441,16 +441,26 @@ func UnEscapeStr(bvalue []byte)[]byte {
 			}
 		case 3: //url escape
 			for j := 0;j<3;j++{
-				if (bvalue[j+i]>='0' && bvalue[j+i] <= '9' || bvalue[i+j] >='a' && bvalue[i+j] <= 'f' ||
-					bvalue[j+i] >='A' && bvalue[j+i] <= 'F') && j<2{
+				curidx := j+i
+				if (curidx < blen) && (bvalue[curidx]>='0' && bvalue[curidx] <= '9' || bvalue[curidx] >='a' && bvalue[curidx] <= 'f' ||
+					bvalue[curidx] >='A' && bvalue[curidx] <= 'F') && j<2{
 					//还是正常的Byte字符，2个字符为一组
 					//escapeType = 2
 				}else{
-					bytestr := FastByte2String(bvalue[i:i+j])
-					if abyte,err := strconv.ParseInt(bytestr,16,32);err==nil{
-						buf = append(buf,byte(abyte))
+					if j < 2{
+						buf = append(buf,bvalue[i-1:curidx]...)//%要加上
 					}else{
-						buf = append(buf,bvalue[i-1:i+j]...)//%要加上
+						bytestr := FastByte2String(bvalue[i:curidx])
+						if abyte,err := strconv.ParseInt(bytestr,16,32);err==nil{
+							if abyte < 0x20 || (abyte>='0' && abyte <= '9' || abyte >='a' && abyte <= 'f' ||
+								abyte >='A' && abyte <= 'F') {
+								buf = append(buf,bvalue[i-1:curidx]...)//%要加上
+							}else{
+								buf = append(buf,byte(abyte))
+							}
+						}else{
+							buf = append(buf,bvalue[i-1:curidx]...)//%要加上
+						}
 					}
 					escapeType = 0
 					i += j - 1
@@ -482,6 +492,8 @@ func UnEscapeStr(bvalue []byte)[]byte {
 		}else{
 			buf = append(buf,bvalue[unicodeidx:i]...)
 		}
+	case 3:
+		buf = append(buf,'%')
 	}
 	return buf
 }
