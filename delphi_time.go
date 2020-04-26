@@ -44,7 +44,7 @@ func (date *TDateTime)WrapTime2Self(t time.Time)  {
 	*date = TDateTime(float64(days) + times)
 }
 
-func Time2DelphiTime(t *time.Time)TDateTime  {
+func Time2DelphiTime(t time.Time)TDateTime  {
 	days := t.Sub(delphiFirstTime) / (time.Hour * 24)
 	y,m,d := t.Date()
 	nowdate := time.Date(y,m,d,0,0,0,0,time.Local)
@@ -112,7 +112,7 @@ func ParserJsonTime(jsontime string)TDateTime  {
 		ntime := time.Now()
 		ns := ntime.Unix()
 		ntime = ntime.Add((time.Duration(ms - ns)*time.Second))
-		return Time2DelphiTime(&ntime)
+		return Time2DelphiTime(ntime)
 	}
 	return -1
 }
