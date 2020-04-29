@@ -15,6 +15,10 @@ func NewAes(initvector []byte)*AES  {
 	return &AES{fInitVector:initvector}
 }
 
+func (aestool *AES)ResetVector(vector []byte)  {
+	aestool.fInitVector = vector
+}
+
 func (aestool *AES)Encrypt(key,value []byte)([]byte,error)  {
 	var realkey []byte
 	btlen := len(key)
