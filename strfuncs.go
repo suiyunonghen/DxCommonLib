@@ -645,6 +645,7 @@ func StrToIntDef(vstr string,defv int64)int64  {
 	}
 	return d
 }
+
 //From github.com/valyala/fastjson/tree/master/fastfloat
 func StrToUintDef(vstr string,defv uint64)uint64 {
 	vlen := uint(len(vstr))
@@ -679,6 +680,10 @@ var (
 	inf = math.Inf(1)
 	nan = math.NaN()
 )
+
+var float64pow10 = [...]float64{
+	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16,
+}
 //github.com/valyala/fastjson/tree/master/fastfloat
 func StrToFloatDef(s string,defv float64) float64 {
 	vlen := uint(len(s))
@@ -745,9 +750,8 @@ func StrToFloatDef(s string,defv float64) float64 {
 			if s[i] >= '0' && s[i] <= '9' {
 				fr = fr*10 + uint64(s[i]-'0')
 				i++
-				if i-j > 18 {
-					// The fractional part may be out of range for uint64.
-					// Fall back to standard parsing.
+				if i-j > uint(len(float64pow10)) {
+					// The mantissa is out of range. Fall back to standard parsing.
 					f, err := strconv.ParseFloat(s, 64)
 					if err != nil && !math.IsInf(f, 0) {
 						return defv
@@ -758,10 +762,10 @@ func StrToFloatDef(s string,defv float64) float64 {
 			}
 			break
 		}
-		if i <= j {
+		if i < j {
 			return defv
 		}
-		f += float64(fr) / math.Pow10(int(i-j))
+		f += float64(fr) / float64pow10[i-j]
 		if i >= uint(len(s)) {
 			// Fast path - parsed fractional number.
 			if minus {
