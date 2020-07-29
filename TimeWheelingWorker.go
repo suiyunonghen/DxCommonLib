@@ -205,16 +205,19 @@ func Sleep(d time.Duration) {
 	defaultTimeWheelWorker.Sleep(d)
 }
 
-func ReSetDefaultTimeWheel(Chkinterval time.Duration,slotBlockCount int){
+func ReSetDefaultTimeWheel(Chkinterval time.Duration,slotBlockCount int,tickerfunc func(nowtime time.Time)){
 	if Chkinterval < minTickerInterval{
 		Chkinterval = minTickerInterval
 	}
-	if defaultTimeWheelWorker.interval != Chkinterval  ||
+	if nil != tickerfunc || defaultTimeWheelWorker.interval != Chkinterval  ||
 		defaultTimeWheelWorker.slockcount != slotBlockCount{
 			defaultTimeWheelWorker.Stop()
 			defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, func() {
 				t := time.Now().Truncate(Chkinterval)
 				coarseTime.Store(&t)
+				if tickerfunc != nil{
+					tickerfunc(t)
+				}
 			})
 	}
 }

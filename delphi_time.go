@@ -45,6 +45,9 @@ func (date *TDateTime)WrapTime2Self(t time.Time)  {
 }
 
 func Time2DelphiTime(t time.Time)TDateTime  {
+	if t.IsZero(){
+		return 0
+	}
 	days := t.Sub(delphiFirstTime) / (time.Hour * 24)
 	y,m,d := t.Date()
 	nowdate := time.Date(y,m,d,0,0,0,0,time.Local)
