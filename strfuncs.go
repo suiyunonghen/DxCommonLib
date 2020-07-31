@@ -324,11 +324,12 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 
 
 //将内容转义成Json字符串
-func EscapeJsonStr(str string) string {
-	return FastByte2String(EscapeJsonbyte(str,nil))
+func EscapeJsonStr(str string,EscapeUnicode bool) string {
+	return FastByte2String(EscapeJsonbyte(str,EscapeUnicode,nil))
 }
 
-func EscapeJsonbyte(str string,dst []byte) []byte {
+
+func EscapeJsonbyte(str string,EscapeUnicode bool,dst []byte) []byte {
 	dstlen := len(dst)
 	strlen := len(str)
 	if dstlen == 0{
@@ -357,24 +358,35 @@ func EscapeJsonbyte(str string,dst []byte) []byte {
 		case '\'':
 			dst = append(dst, '\\','\'')
 		default:
-			switch {
-			case runedata < utf8.RuneSelf:
-				dst = append(dst,byte(runedata))
-			case runedata < ' ':
-				dst = append(dst, '\\','x')
-				dst = append(dst, vhex[byte(runedata)>>4],vhex[byte(runedata)&0xF])
-			case runedata > utf8.MaxRune:
-				runedata = 0xFFFD
-				fallthrough
-			case runedata < 0x10000:
-				dst = append(dst, `\u`...)
-				for s := 12; s >= 0; s -= 4 {
-					dst = append(dst, vhex[runedata>>uint(s)&0xF])
+			if EscapeUnicode{
+				switch {
+				case runedata < utf8.RuneSelf:
+					dst = append(dst,byte(runedata))
+				case runedata < ' ':
+					dst = append(dst, '\\','x')
+					dst = append(dst, vhex[byte(runedata)>>4],vhex[byte(runedata)&0xF])
+				case runedata > utf8.MaxRune:
+					runedata = 0xFFFD
+					fallthrough
+				case runedata < 0x10000:
+					dst = append(dst, `\u`...)
+					for s := 12; s >= 0; s -= 4 {
+						dst = append(dst, vhex[runedata>>uint(s)&0xF])
+					}
+				default:
+					dst = append(dst, `\U`...)
+					for s := 28; s >= 0; s -= 4 {
+						dst = append(dst, vhex[runedata>>uint(s)&0xF])
+					}
 				}
-			default:
-				dst = append(dst, `\U`...)
-				for s := 28; s >= 0; s -= 4 {
-					dst = append(dst, vhex[runedata>>uint(s)&0xF])
+			}else{
+				if runedata < utf8.RuneSelf {
+					dst = append(dst,byte(runedata))
+				}else{
+					l := len(dst)
+					dst = append(dst,0,0,0,0)
+					n := utf8.EncodeRune(dst[l:l+4],runedata)
+					dst = dst[:l+n]
 				}
 			}
 		}
