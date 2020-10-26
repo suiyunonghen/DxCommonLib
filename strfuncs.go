@@ -710,9 +710,10 @@ func StrToFloatDef(s string,defv float64) float64 {
 			return defv
 		}
 	}
+
 	d := uint64(0)
 	j := i
-	for i < uint(len(s)) {
+	for i < vlen {
 		if s[i] >= '0' && s[i] <= '9' {
 			d = d*10 + uint64(s[i]-'0')
 			i++
@@ -730,13 +731,17 @@ func StrToFloatDef(s string,defv float64) float64 {
 		break
 	}
 	if i <= j {
-		if strings.EqualFold(s[i:], "inf") {
+		ss := s[i:]
+		if strings.HasPrefix(ss, "+") {
+			ss = ss[1:]
+		}
+		if strings.EqualFold(ss, "inf") {
 			if minus {
 				return -inf
 			}
 			return inf
 		}
-		if strings.EqualFold(s[i:], "nan") {
+		if strings.EqualFold(ss, "nan") {
 			return nan
 		}
 		return defv
@@ -756,13 +761,12 @@ func StrToFloatDef(s string,defv float64) float64 {
 		if i >= uint(len(s)) {
 			return defv
 		}
-		fr := uint64(0)
-		j := i
+		k := i
 		for i < uint(len(s)) {
 			if s[i] >= '0' && s[i] <= '9' {
-				fr = fr*10 + uint64(s[i]-'0')
+				d = d*10 + uint64(s[i]-'0')
 				i++
-				if i-j > uint(len(float64pow10)) {
+				if i-j >= uint(len(float64pow10)) {
 					// The mantissa is out of range. Fall back to standard parsing.
 					f, err := strconv.ParseFloat(s, 64)
 					if err != nil && !math.IsInf(f, 0) {
@@ -774,10 +778,11 @@ func StrToFloatDef(s string,defv float64) float64 {
 			}
 			break
 		}
-		if i < j {
+		if i < k {
 			return defv
 		}
-		f += float64(fr) / float64pow10[i-j]
+		// Convert the entire mantissa to a float at once to avoid rounding errors.
+		f = float64(d) / float64pow10[i-k]
 		if i >= uint(len(s)) {
 			// Fast path - parsed fractional number.
 			if minus {

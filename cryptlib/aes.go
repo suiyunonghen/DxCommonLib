@@ -109,3 +109,27 @@ func (aestool *AES)DecryptWithHex(value,key string) string {
 	}
 	return string(origData)
 }
+
+func (aestool *AES)Decrypt(value []byte,key string) []byte {
+	var realkey []byte
+	bt := []byte(key)
+	btlen := len(bt)
+	if btlen < 16{
+		realkey = append(bt,make([]byte,16-btlen)...)
+	}else{
+		realkey = bt[:16]
+	}
+	block, err := aes.NewCipher(realkey[:16])
+	if err != nil {
+		return value
+	}
+	blockSize := block.BlockSize()
+	blockMode := cipher.NewCBCDecrypter(block,aestool.fInitVector[:blockSize])
+	origData := make([]byte, len(value))
+	blockMode.CryptBlocks(origData, value)
+	origData = PKCS5UnPadding(origData)
+	if origData == nil{
+		return value
+	}
+	return origData
+}
