@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -242,6 +243,30 @@ func UTF16Byte2string(utf16bt []byte,isBigEnd bool)string  {
 		}
 	}
 	return string(utf16.Decode(uint16arr[:arrlen]))
+}
+
+func String2Utf16Byte(s string)([]byte,error)  {
+	bt,err := syscall.UTF16FromString(s)
+	if err != nil{
+		return nil,err
+	}
+	btlen := len(bt) * 2
+	result := make([]byte,btlen)
+	CopyMemory(unsafe.Pointer(&result[0]),unsafe.Pointer(&bt[0]),uintptr(btlen))
+	return result,nil
+}
+
+func FastString2Utf16Byte(s string)([]byte,error)  {
+	bt,err := syscall.UTF16FromString(s)
+	if err != nil{
+		return nil,err
+	}
+	strHead := (*reflect.SliceHeader)(unsafe.Pointer(&bt))
+	var sliceHead reflect.SliceHeader
+	sliceHead.Len = strHead.Len * 2
+	sliceHead.Data = strHead.Data
+	sliceHead.Cap = strHead.Cap * 2
+	return *(*[]byte)(unsafe.Pointer(&sliceHead)),nil
 }
 
 //将drwxrwx这些转化为 FileMode
