@@ -18,7 +18,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -245,8 +244,9 @@ func UTF16Byte2string(utf16bt []byte,isBigEnd bool)string  {
 	return string(utf16.Decode(uint16arr[:arrlen]))
 }
 
+
 func String2Utf16Byte(s string)([]byte,error)  {
-	bt,err := syscall.UTF16FromString(s)
+	bt,err := UTF16FromString(s)
 	if err != nil{
 		return nil,err
 	}
@@ -257,7 +257,7 @@ func String2Utf16Byte(s string)([]byte,error)  {
 }
 
 func FastString2Utf16Byte(s string)([]byte,error)  {
-	bt,err := syscall.UTF16FromString(s)
+	bt,err := UTF16FromString(s)
 	if err != nil{
 		return nil,err
 	}

@@ -2,14 +2,14 @@ module github.com/suiyunonghen/DxCommonLib
 
 go 1.12
 
-require golang.org/x/text v0.3.2
+require golang.org/x/text v0.3.4
 
 replace (
-	golang.org/x/crypto => github.com/golang/crypto v0.0.0-20190820162420-60c769a6c586
-	golang.org/x/net => github.com/golang/net v0.0.0-20190813141303-74dc4d7220e7
-	golang.org/x/sync => github.com/golang/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys => github.com/golang/sys v0.0.0-20190813064441-fde4db37ae7a
-	golang.org/x/text => github.com/golang/text v0.3.2
-	golang.org/x/tools => github.com/golang/tools v0.0.0-20190822000311-fc82fb2afd64
-	golang.org/x/xerrors => github.com/golang/xerrors v0.0.0-20190717185122-a985d3407aa7
+	golang.org/x/crypto => github.com/golang/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/net => github.com/golang/net v0.0.0-20201031054903-ff519b6c9102
+	golang.org/x/sync => github.com/golang/sync v0.0.0-20201020160332-67f06af15bc9
+	golang.org/x/sys => github.com/golang/sys v0.0.0-20201101102859-da207088b7d1
+	golang.org/x/text => github.com/golang/text v0.3.4
+	golang.org/x/tools => github.com/golang/tools v0.0.0-20201102005753-1f28ee682075
+	golang.org/x/xerrors => github.com/golang/xerrors v0.0.0-20200804184101-5ec99f83aff1
 )
