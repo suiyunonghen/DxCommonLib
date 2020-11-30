@@ -1,4 +1,5 @@
 // +build linux darwin dragonfly freebsd netbsd openbsd
+
 package DxCommonLib
 
 import (
