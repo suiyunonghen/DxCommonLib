@@ -382,8 +382,8 @@ func EscapeJsonbyte(str string,EscapeUnicode bool,dst []byte) []byte {
 			dst = append(dst, '\\','\\')
 		case '"':
 			dst = append(dst, '\\','"')
-		case '\'':
-			dst = append(dst, '\\','\'')
+		/*case '\'':
+			dst = append(dst, '\\','\'')*/
 		default:
 			if EscapeUnicode{
 				switch {
