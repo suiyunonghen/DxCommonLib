@@ -432,18 +432,18 @@ func UnEscapeStr(bvalue []byte)[]byte {
 		case 1://json escapin
 			escapeType = 0
 			switch bvalue[i] {
-			case 'a':
-				buf = append(buf,'\a')
-			case 'b':
-				buf = append(buf,'\b')
-			case 'f':
-				buf = append(buf,'\f')
 			case 'n':
 				buf = append(buf,'\n')
 			case 'r':
 				buf = append(buf,'\r')
 			case 't':
 				buf = append(buf,'\t')
+			case 'a':
+				buf = append(buf,'\a')
+			case 'b':
+				buf = append(buf,'\b')
+			case 'f':
+				buf = append(buf,'\f')
 			case 'v':
 				buf = append(buf,'\v')
 			case '\\':
