@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
-	"io/ioutil"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -60,10 +60,28 @@ func ZeroByteSlice(bt []byte)  {
 	}
 }
 
+func ReadAll(r io.Reader) ([]byte, error) {
+	b := make([]byte, 0, 512)
+	for {
+		if len(b) == cap(b) {
+			// Add more capacity (let append pick how much).
+			b = append(b, 0)[:len(b)]
+		}
+		n, err := r.Read(b[len(b):cap(b)])
+		b = b[:len(b)+n]
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			return b, err
+		}
+	}
+}
+
 func GBKString(str string)([]byte,error)  {
 	reader := bytes.NewReader([]byte(str))
 	O := transform.NewReader(reader, simplifiedchinese.GBK.NewEncoder())
-	d, e := ioutil.ReadAll(O)
+	d, e := ReadAll(O)
 	if e != nil {
 		return nil,e
 	}
@@ -73,7 +91,7 @@ func GBKString(str string)([]byte,error)  {
 func GBK2Utf8(gbk []byte)([]byte,error){
 	reader := bytes.NewReader(gbk)
 	O := transform.NewReader(reader, simplifiedchinese.GBK.NewDecoder())
-	d, e := ioutil.ReadAll(O)
+	d, e := ReadAll(O)
 	if e != nil {
 		return nil,e
 	}
