@@ -439,7 +439,7 @@ func EscapeJsonbyte(str string,EscapeUnicode bool,dst []byte) []byte {
 	return dst
 }
 
-func UnEscapeStr(bvalue []byte)[]byte {
+func UnEscapeStr(bvalue []byte,unEscapeUrl bool)[]byte {
 	buf := make([]byte,0,256)
 	blen := len(bvalue)
 	i := 0
@@ -529,7 +529,11 @@ func UnEscapeStr(bvalue []byte)[]byte {
 			case '\\':
 				escapeType = 1 //json escapin
 			case '%':
-				escapeType = 3 // url escape
+				if unEscapeUrl{
+					escapeType = 3 // url escape
+				}else{
+					buf = append(buf,bvalue[i])
+				}
 			default:
 				buf = append(buf,bvalue[i])
 			}
@@ -557,8 +561,8 @@ func UnEscapeStr(bvalue []byte)[]byte {
 
 
 //解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
-func ParserEscapeStr(bvalue []byte)string {
-	return FastByte2String(UnEscapeStr(bvalue))
+func ParserEscapeStr(bvalue []byte,unEscapeUrl bool)string {
+	return FastByte2String(UnEscapeStr(bvalue,unEscapeUrl))
 }
 
 //Date(1402384458000)
