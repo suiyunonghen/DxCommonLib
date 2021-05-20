@@ -725,18 +725,19 @@ func ParseFloat(s string) (float64, error) {
 	if len(s) == 0 {
 		return 0, fmt.Errorf("cannot parse float64 from empty string")
 	}
+	slen := uint(len(s))
 	i := uint(0)
 	minus := s[0] == '-'
 	if minus {
 		i++
-		if i >= uint(len(s)) {
+		if i >= slen {
 			return 0, fmt.Errorf("cannot parse float64 from %q", s)
 		}
 	}
 
 	d := uint64(0)
 	j := i
-	for i < uint(len(s)) {
+	for i < slen {
 		if s[i] >= '0' && s[i] <= '9' {
 			d = d*10 + uint64(s[i]-'0')
 			i++
@@ -770,7 +771,7 @@ func ParseFloat(s string) (float64, error) {
 		return 0, fmt.Errorf("unparsed tail left after parsing float64 from %q: %q", s, ss)
 	}
 	f := float64(d)
-	if i >= uint(len(s)) {
+	if i >= slen {
 		// Fast path - just integer.
 		if minus {
 			f = -f
@@ -781,11 +782,11 @@ func ParseFloat(s string) (float64, error) {
 	if s[i] == '.' {
 		// Parse fractional part.
 		i++
-		if i >= uint(len(s)) {
+		if i >= slen {
 			return 0, fmt.Errorf("cannot parse fractional part in %q", s)
 		}
 		k := i
-		for i < uint(len(s)) {
+		for i < slen {
 			if s[i] >= '0' && s[i] <= '9' {
 				d = d*10 + uint64(s[i]-'0')
 				i++
@@ -806,7 +807,7 @@ func ParseFloat(s string) (float64, error) {
 		}
 		// Convert the entire mantissa to a float at once to avoid rounding errors.
 		f = float64(d) / float64pow10[i-k]
-		if i >= uint(len(s)) {
+		if i >= slen {
 			// Fast path - parsed fractional number.
 			if minus {
 				f = -f
@@ -817,26 +818,32 @@ func ParseFloat(s string) (float64, error) {
 	if s[i] == 'e' || s[i] == 'E' {
 		// Parse exponent part.
 		i++
-		if i >= uint(len(s)) {
+		if i >= slen {
 			return 0, fmt.Errorf("cannot parse exponent in %q", s)
 		}
 		expMinus := false
 		if s[i] == '+' || s[i] == '-' {
 			expMinus = s[i] == '-'
 			i++
-			if i >= uint(len(s)) {
+			if i >= slen {
 				return 0, fmt.Errorf("cannot parse exponent in %q", s)
 			}
 		}
 		exp := int16(0)
 		j := i
-		for i < uint(len(s)) {
+
+		for i < slen {
 			if s[i] >= '0' && s[i] <= '9' {
 				exp = exp*10 + int16(s[i]-'0')
 				i++
 				if exp > 300 {
 					// The exponent may be too big for float64.
 					// Fall back to standard parsing.
+					for k := i;k < slen;k++{
+						if s[k] < '0' || s[k] > '9'{
+							return 0, fmt.Errorf("cannot parse float64 from %q", s)
+						}
+					}
 					f, err := strconv.ParseFloat(s, 64)
 					if err != nil && !math.IsInf(f, 0) {
 						return 0, fmt.Errorf("cannot parse exponent in %q: %s", s, err)
