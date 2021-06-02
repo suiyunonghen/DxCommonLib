@@ -189,7 +189,7 @@ func (workers *GWorkers) getCh() *workerChan {
 }
 
 func (workers *GWorkers) release(ch *workerChan) bool {
-	ch.lastUseTime = Now()
+	ch.lastUseTime = time.Now()
 	workers.lock.Lock()
 	if workers.mustStop {
 		workers.lock.Unlock()

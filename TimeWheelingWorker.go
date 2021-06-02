@@ -8,7 +8,6 @@ package DxCommonLib
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
 )
 const(
@@ -32,7 +31,7 @@ type (
 		quitchan   chan struct{}
 		curindex   int //当前的索引
 		interval   time.Duration
-		tkfunc		func(now time.Time)
+		tkfunc		func()
 		recordPool	sync.Pool
 	}
 )
@@ -40,12 +39,11 @@ type (
 
 var (
 	defaultTimeWheelWorker *TimeWheelWorker
-    coarseTime 				atomic.Value		//存放的是当前的实际时间
 )
 
 //interval指定调度的时间间隔
 //slotBlockCount指定时间轮的块长度
-func NewTimeWheelWorker(interval time.Duration, slotBlockCount int,tkfunc func(now time.Time)) *TimeWheelWorker {
+func NewTimeWheelWorker(interval time.Duration, slotBlockCount int,tkfunc func()) *TimeWheelWorker {
 	if interval < minTickerInterval{
 		interval = minTickerInterval
 	}
@@ -62,16 +60,9 @@ func NewTimeWheelWorker(interval time.Duration, slotBlockCount int,tkfunc func(n
 }
 
 func (worker *TimeWheelWorker) run() {
-	curTime := time.Now()
-	coarseTime.Store(curTime)
 	for {
 		select {
 		case <-worker.ticker.C:
-			//执行定时操作
-			//获取当前的时间槽数据
-			curTime = coarseTime.Load().(time.Time)
-			curTime = curTime.Add(worker.interval)
-			coarseTime.Store(curTime)
 			worker.Lock()
 			lastrec := worker.timeslocks[worker.curindex]
 			if lastrec != nil{
@@ -101,7 +92,7 @@ func (worker *TimeWheelWorker) run() {
 			worker.curindex = (worker.curindex + 1) % worker.slockcount
 			worker.Unlock()
 			if worker.tkfunc!=nil{
-				worker.tkfunc(curTime)
+				worker.tkfunc()
 			}
 		case <-worker.quitchan:
 			worker.ticker.Stop()
@@ -219,39 +210,19 @@ func Sleep(d time.Duration) {
 	defaultTimeWheelWorker.Sleep(d)
 }
 
-func ReSetDefaultTimeWheel(Chkinterval time.Duration,slotBlockCount int,tickerfunc func(nowtime time.Time)){
+func ReSetDefaultTimeWheel(Chkinterval time.Duration,slotBlockCount int,tickerfunc func()){
 	if Chkinterval < minTickerInterval{
 		Chkinterval = minTickerInterval
 	}
 	if defaultTimeWheelWorker == nil{
-		defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, func(nowtime time.Time) {
-			if tickerfunc != nil{
-				tickerfunc(nowtime)
-			}
-		})
+		defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, tickerfunc)
 		return
 	}
 	if nil != tickerfunc || defaultTimeWheelWorker.interval != Chkinterval  ||
 		defaultTimeWheelWorker.slockcount != slotBlockCount{
 			defaultTimeWheelWorker.Stop()
 
-			defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, func(nowtime time.Time) {
-				if tickerfunc != nil{
-					tickerfunc(nowtime)
-				}
-			})
+			defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, tickerfunc)
 	}
-}
-
-
-func Now() time.Time {
-	if defaultTimeWheelWorker == nil{
-		return time.Now()
-	}
-	v := coarseTime.Load()
-	if v == nil{
-		return time.Now()
-	}
-	return v.(time.Time)
 }
 
