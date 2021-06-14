@@ -179,6 +179,14 @@ func FastPchar2String(pcharstr uintptr)string  {
 	return string(utf16.Decode(*(*[] uint16)(unsafe.Pointer(s))))
 }
 
+func FastPByte2ByteSlice(pByte uintptr,byteLen int)[]byte  {
+	s := new(reflect.SliceHeader)
+	s.Data = pByte
+	s.Len = byteLen
+	s.Cap = s.Len
+	return *(*[]byte)(unsafe.Pointer(s))
+}
+
 //将Delphi的Pchar转换到string,Unicode
 func DelphiPchar2String(dstr uintptr)string  {
 	if dstr == 0{
