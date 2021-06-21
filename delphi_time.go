@@ -2,6 +2,7 @@ package DxCommonLib
 
 import (
 	"bytes"
+	"errors"
 	"runtime"
 	"strconv"
 	"time"
@@ -20,6 +21,7 @@ const (
 var (
 	delphiFirstTime time.Time
 	IsAmd64 = runtime.GOARCH == "amd64"
+	ErrInvalidJsonDateTime = errors.New("invalidate json dateTime format")
 )
 
 func init() {
@@ -57,7 +59,7 @@ func Time2DelphiTime(t time.Time)TDateTime  {
 
 //Date(1402384458000)
 //Date(1224043200000+0800)
-func ParserJsonTime(jsontime string)TDateTime  {
+func ParserJsonTime(jsontime string)(time.Time,error)  {
 	bt := FastString2Byte(jsontime)
 	dtflaglen := 0
 	endlen := 0
@@ -84,7 +86,7 @@ func ParserJsonTime(jsontime string)TDateTime  {
 		if idx < 0{
 			str := FastByte2String(bt[:])
 			if ms,err = strconv.ParseInt(str,10,64);err != nil{
-				return -1
+				return time.Time{},ErrInvalidJsonDateTime
 			}
 			if len(str) > 9{
 				ms = ms / 1000
@@ -96,16 +98,16 @@ func ParserJsonTime(jsontime string)TDateTime  {
 			str := FastByte2String(bt[:idx])
 			ms,err = strconv.ParseInt(str,10,64)
 			if err != nil{
-				return -1
+				return time.Time{},err
 			}
 			bt = bt[idx+1:]
 			if len(bt) < 2{
-				return -1
+				return time.Time{},ErrInvalidJsonDateTime
 			}
 			bt = bt[:2]
 			ctz,err := strconv.Atoi(FastByte2String(bt))
 			if err != nil{
-				return -1
+				return time.Time{},ErrInvalidJsonDateTime
 			}
 			if len(str) > 9{
 				ms = ms / 1000
@@ -115,8 +117,8 @@ func ParserJsonTime(jsontime string)TDateTime  {
 		ntime := time.Now()
 		ns := ntime.Unix()
 		ntime = ntime.Add((time.Duration(ms - ns)*time.Second))
-		return Time2DelphiTime(ntime)
+		return ntime,nil
 	}
-	return -1
+	return time.Time{},ErrInvalidJsonDateTime
 }
 
