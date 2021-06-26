@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 	"unsafe"
@@ -232,8 +233,162 @@ func FastString2Byte(str string)[]byte  {
 	return *(*[]byte)(unsafe.Pointer(&sliceHead))
 }
 
+func StringData(str string)(uintptr,int)  {
+	strHead := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	return strHead.Data,strHead.Len
+}
+
 func FastByte2String(bt []byte)string  {
 	return *(*string)(unsafe.Pointer(&bt))
+}
+
+//此函数的返回值不能修改
+func Utf8String(utf8Data uintptr,utf8Len int)string  {
+	var strHead reflect.StringHeader
+	strHead.Len = utf8Len
+	strHead.Data = utf8Data
+	return *(*string)(unsafe.Pointer(&strHead))
+}
+
+//返回值不能修改
+func Buffer2ByteSlice(Data uintptr,DataLen int)[]byte  {
+	var sliceHead reflect.SliceHeader
+	sliceHead.Len = DataLen
+	sliceHead.Data = Data
+	sliceHead.Cap = DataLen
+	return *(*[]byte)(unsafe.Pointer(&sliceHead))
+}
+//判断二进制数组是否是可打印的字符串,如果打印字符的的百分比超过了指定的printPercent， 认为是可显示的Plaintext
+//scanStyle 0 表示全扫描,1表示扫描头部10个rune,2表示扫描两头，3表示扫描前中尾
+func ByteSliceIsPrintString(Data []byte,scanStyle byte)bool  {
+	idx := 0
+	printC := 0
+	runeCount := 0
+	DataLen := len(Data)
+	if DataLen <= 30{
+		scanStyle = 0
+	}
+	scanHead := func()bool {
+		for idx < DataLen && runeCount < 10{
+			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
+				idx += l
+				runeCount++
+				if unicode.IsPrint(r){
+					printC++
+				}else if l != DataLen - 1{
+					//中间有不可显示的字符
+					return false
+				}
+			}else if l != DataLen - 1{
+				//不是最后一个，肯定不是一个有效的可显示的字符串了，
+				return false
+			}
+		}
+		return true
+	}
+	scanEnd := func()bool {
+		firstScan := true
+		firstDec := 0
+		idx = DataLen - 30
+		runeCount = 0
+		for idx < DataLen && runeCount < 10{
+			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
+				idx += l
+				runeCount++
+				if unicode.IsPrint(r){
+					printC++
+				}else if l != DataLen - 1{
+					//中间有不可显示的字符
+					return false
+				}
+			}else if firstScan{
+				idx--
+				firstDec++
+				if firstDec > 3{
+					return false
+				}
+			} else if l != DataLen - 1{
+				//不是最后一个，肯定不是一个有效的可显示的字符串了，
+				return false
+			}
+		}
+		return true
+	}
+
+	scanMid := func()bool {
+		firstScan := true
+		firstDec := 0
+		idx = DataLen / 3 - 15
+		runeCount = 0
+		for idx < DataLen && runeCount < 10{
+			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
+				idx += l
+				runeCount++
+				if unicode.IsPrint(r){
+					printC++
+				}else if l != DataLen - 1{
+					//中间有不可显示的字符
+					return false
+				}
+			}else if firstScan{
+				idx--
+				firstDec++
+				if firstDec > 3{
+					return false
+				}
+			} else if l != DataLen - 1{
+				//不是最后一个，肯定不是一个有效的可显示的字符串了，
+				return false
+			}
+		}
+		return true
+	}
+	switch scanStyle {
+	case 0:
+		for idx < DataLen{
+			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
+				idx += l
+				runeCount++
+				if unicode.IsPrint(r){
+					printC++
+				}else if l != DataLen - 1{
+					//中间有不可显示的字符
+					return false
+				}
+			}else if l != DataLen - 1{
+				//不是最后一个，肯定不是一个有效的可显示的字符串了，
+				return false
+			}
+		}
+	case 1:
+		if !scanHead(){
+			return false
+		}
+	case 2:
+		//扫描前后
+		if !scanHead(){
+			return false
+		}
+		if !scanEnd(){
+			return false
+		}
+	case 3:
+		//扫描前中后
+		if !scanHead(){
+			return false
+		}
+		if !scanMid(){
+			return false
+		}
+		if !scanEnd(){
+			return false
+		}
+	}
+	if runeCount == 0{
+		return true
+	}
+	percent := 100 * float32(printC/runeCount)
+	return percent >= 80
 }
 
 func UTF16Byte2string(utf16bt []byte,isBigEnd bool)string  {
