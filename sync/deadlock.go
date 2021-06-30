@@ -19,6 +19,38 @@ var bufferPool = sync.Pool{
 	},
 }
 
+type mutexStruct struct {}
+
+func (mutex mutexStruct)caller(offset int) (string, string) {
+	//0是当前位置,1是上一个位置Lock,2是调用点位置
+	pc, file, line, ok := runtime.Caller(2 + offset)
+	if !ok {
+		return "", ""
+	}
+	buffer := bufferPool.Get().([]byte)
+	idx := strings.LastIndexByte(file, '/')
+	if idx == -1 {
+		buffer = append(buffer[:0], file...)
+	} else {
+		idx = strings.LastIndexByte(file[:idx], '/')
+		if idx == -1 {
+			buffer = append(buffer[:0], file...)
+		} else {
+			buffer = append(buffer[:0], file[idx+1:]...)
+		}
+	}
+	funcName := runtime.FuncForPC(pc).Name()
+	buffer = append(buffer, ':')
+	buffer = strconv.AppendInt(buffer, int64(line), 10)
+	result := string(buffer)
+	bufferPool.Put(buffer)
+	idx = strings.IndexByte(funcName, '.')
+	if idx > 0 {
+		funcName = funcName[idx+1:]
+	}
+	return result, funcName
+}
+
 type LockStyle	uint8
 
 const(
@@ -38,7 +70,7 @@ type LockInfo struct {
 	GoRoutine		uint64
 	Caller			string			//调用Lock的位置
 	CallerFunc		string			//调用Lock的函数
-	Owner			*RWMutexEx
+	Owner			*mutexStruct
 }
 
 func (lckInfo *LockInfo)String()string {
@@ -71,37 +103,8 @@ func getGID() uint64 {
 // 扩展支持检查死锁
 
 type RWMutexEx struct {
+	mutexStruct
 	sync.RWMutex
-}
-
-func (mutex *RWMutexEx) caller(offset int) (string, string) {
-	//0是当前位置,1是上一个位置Lock,2是调用点位置
-	pc, file, line, ok := runtime.Caller(2 + offset)
-	if !ok {
-		return "", ""
-	}
-	buffer := bufferPool.Get().([]byte)
-	idx := strings.LastIndexByte(file, '/')
-	if idx == -1 {
-		buffer = append(buffer[:0], file...)
-	} else {
-		idx = strings.LastIndexByte(file[:idx], '/')
-		if idx == -1 {
-			buffer = append(buffer[:0], file...)
-		} else {
-			buffer = append(buffer[:0], file[idx+1:]...)
-		}
-	}
-	funcName := runtime.FuncForPC(pc).Name()
-	buffer = append(buffer, ':')
-	buffer = strconv.AppendInt(buffer, int64(line), 10)
-	result := string(buffer)
-	bufferPool.Put(buffer)
-	idx = strings.IndexByte(funcName, '.')
-	if idx > 0 {
-		funcName = funcName[idx+1:]
-	}
-	return result, funcName
 }
 
 func (mutex *RWMutexEx)Lock()  {
@@ -120,7 +123,7 @@ func (mutex *RWMutexEx)Lock()  {
 		StartTime: time.Now(),
 		GoRoutine: gid,
 		Caller:	caller,
-		Owner: mutex,
+		Owner: &mutex.mutexStruct,
 		CallerFunc: method,
 	}
 	mutex.RWMutex.Lock()
@@ -131,7 +134,7 @@ func (mutex *RWMutexEx)Lock()  {
 		StartTime: time.Now(),
 		GoRoutine: gid,
 		Caller:	caller,
-		Owner: mutex,
+		Owner: &mutex.mutexStruct,
 		CallerFunc: method,
 	}
 }
@@ -151,7 +154,7 @@ func (mutex *RWMutexEx)RLock()  {
 		StartTime: time.Now(),
 		GoRoutine: gid,
 		Caller:	caller,
-		Owner: mutex,
+		Owner: &mutex.mutexStruct,
 		CallerFunc: method,
 	}
 	mutex.RWMutex.RLock()
@@ -162,7 +165,7 @@ func (mutex *RWMutexEx)RLock()  {
 		StartTime: time.Now(),
 		GoRoutine: gid,
 		Caller:	caller,
-		Owner: mutex,
+		Owner: &mutex.mutexStruct,
 		CallerFunc: method,
 	}
 }
@@ -181,7 +184,7 @@ func (mutex *RWMutexEx)Unlock()  {
 		StartTime: time.Now(),
 		GoRoutine: gid,
 		Caller:	caller,
-		Owner: mutex,
+		Owner: &mutex.mutexStruct,
 		CallerFunc: method,
 	}
 	mutex.RWMutex.Unlock()
@@ -201,11 +204,69 @@ func (mutex *RWMutexEx)RUnlock()  {
 		StartTime: time.Now(),
 		GoRoutine: gid,
 		Caller:	caller,
-		Owner: mutex,
+		Owner: &mutex.mutexStruct,
 		CallerFunc: method,
 	}
 	mutex.RWMutex.RUnlock()
 }
+
+type MutexEx struct {
+	mutexStruct
+	sync.Mutex
+}
+
+func (mutex *MutexEx)Lock()  {
+	if atomic.LoadInt32(&deadCheck) == 0{
+		mutex.Mutex.Lock()
+		return
+	}
+	//先获取当前的位置
+	lockWaitId := atomic.AddInt64(&lckId,1)
+	gid := getGID()
+	caller,method := mutex.caller(0)
+	lockChan <- LockInfo{
+		IsRLock: false,
+		LockStyle: LckLockBlock,	//lockWait
+		lockWaitId: lockWaitId,
+		StartTime: time.Now(),
+		GoRoutine: gid,
+		Caller:	caller,
+		Owner: &mutex.mutexStruct,
+		CallerFunc: method,
+	}
+	mutex.Mutex.Lock()
+	lockChan <- LockInfo{
+		IsRLock: false,
+		LockStyle: LckLocking,
+		lockWaitId: lockWaitId,
+		StartTime: time.Now(),
+		GoRoutine: gid,
+		Caller:	caller,
+		Owner: &mutex.mutexStruct,
+		CallerFunc: method,
+	}
+}
+
+func (mutex *MutexEx)Unlock()  {
+	if atomic.LoadInt32(&deadCheck) == 0{
+		mutex.Mutex.Unlock()
+		return
+	}
+	gid := getGID()
+	caller,method := mutex.caller(0)
+	lockChan <- LockInfo{
+		IsRLock: false,
+		LockStyle: LckUnLock,
+		lockWaitId: -1,
+		StartTime: time.Now(),
+		GoRoutine: gid,
+		Caller:	caller,
+		Owner: &mutex.mutexStruct,
+		CallerFunc: method,
+	}
+	mutex.Mutex.Unlock()
+}
+
 
 type DeadLockInfo struct {
 	LockTimes	time.Duration
@@ -218,16 +279,24 @@ func (lockInf *DeadLockInfo)String()string  {
 
 var lockChan chan  LockInfo
 var lckId int64
-var DeadLockNotify func(deadLocks ...DeadLockInfo)
-var DebugLog func(format string,data ...interface{})
+var deadLockNotify func(deadLocks ...DeadLockInfo)
+var debugLog func(format string,data ...interface{})
 var deadCheck int32
 var quitDeadCheck chan struct{}
-func SetDeadCheck(deadChecked bool)  {
+func SetDeadCheck(deadChecked bool,lockNotify func(deadLocks ...DeadLockInfo),log func(format string,data ...interface{}))  {
+	debugLog = log
 	if deadChecked{
+		if debugLog != nil{
+			debugLog("启动DeadLock检查")
+		}
+		deadLockNotify = lockNotify
 		atomic.StoreInt32(&deadCheck,1)
 		quitDeadCheck = make(chan struct{})
 		go checkDeadLock(quitDeadCheck)
 	}else{
+		if debugLog != nil {
+			debugLog("关闭DeadLock检查")
+		}
 		atomic.StoreInt32(&deadCheck,0)
 		if quitDeadCheck != nil{
 			close(quitDeadCheck)
@@ -236,14 +305,11 @@ func SetDeadCheck(deadChecked bool)  {
 	}
 }
 
-func debugPrint(format string,data ...interface{})  {
-	fmt.Fprintf(os.Stdout,format,data...)
-}
-
 func init()  {
 	lockChan = make(chan LockInfo,256)
-	DebugLog = debugPrint
-	SetDeadCheck(true)
+	SetDeadCheck(false,nil, func(format string, data ...interface{}) {
+		fmt.Fprintf(os.Stdout,format,data...)
+	})
 }
 
 func checkDeadLock(quit chan struct{})  {
@@ -288,10 +354,8 @@ func checkDeadLock(quit chan struct{})  {
 					}
 				}
 				DxCommonLib.PostFunc(func(data ...interface{}) {
-					if foundLock.Owner == nil{
-						DebugLog("未找到在同一goroutine的成对释放%s",lckInfo.String())
-					}else{
-						DebugLog("锁定%s\r\n释放%s",foundLock.String(),lckInfo.String())
+					if foundLock.Owner == nil && debugLog != nil{
+						debugLog("未找到在同一goroutine的成对释放%s",lckInfo.String())
 					}
 				})
 			}
@@ -311,14 +375,14 @@ func checkDeadLock(quit chan struct{})  {
 			}
 			//显示一下其他锁等待的时长
 			if len(lockTimeouts) > 0{
-				if DeadLockNotify != nil{
+				if deadLockNotify != nil{
 					DxCommonLib.PostFunc(func(data ...interface{}) {
-						DeadLockNotify(lockTimeouts...)
+						deadLockNotify(lockTimeouts...)
 					})
-				}else{
+				}else if debugLog != nil{
 					DxCommonLib.PostFunc(func(data ...interface{}) {
 						for i := range lockTimeouts{
-							DebugLog("可能已经死锁：%s\r\n",lockTimeouts[i].String())
+							debugLog("可能已经死锁：%s\r\n",lockTimeouts[i].String())
 						}
 					})
 				}
