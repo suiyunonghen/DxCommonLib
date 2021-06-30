@@ -26,10 +26,12 @@ import (
 )
 
 //内存拷贝函数
+
 //go:linkname CopyMemory runtime.memmove
 func CopyMemory(to, from unsafe.Pointer, n uintptr)
 
 //清空内存
+
 //go:linkname ZeroMemory runtime.memclrNoHeapPointers
 func ZeroMemory(ptr unsafe.Pointer, n uintptr)
 
@@ -47,6 +49,7 @@ func Ord(x bool) uint8 {
 
 
 //内存比较函数
+
 func CompareMem(a,b unsafe.Pointer,size int)bool  {
 	if size <= 0{
 		return memequal_varlen(a,b)
@@ -123,6 +126,7 @@ func DelphiPcharLen(dstr uintptr)(result int32)  {
 }
 
 //将常规的pchar返回到string
+
 func Pchar2String(pcharstr uintptr)string  {
 	if pcharstr == 0{
 		return ""
@@ -189,6 +193,7 @@ func FastPByte2ByteSlice(pByte uintptr,byteLen int)[]byte  {
 }
 
 //将Delphi的Pchar转换到string,Unicode
+
 func DelphiPchar2String(dstr uintptr)string  {
 	if dstr == 0{
 		return ""
@@ -224,6 +229,7 @@ func FastBytes2Uint16s(bt []byte)[]uint16  {
 }
 
 //本函数只作为强制转换使用，不可将返回的Slice再做修改处理
+
 func FastString2Byte(str string)[]byte  {
 	strHead := (*reflect.StringHeader)(unsafe.Pointer(&str))
 	var sliceHead reflect.SliceHeader
@@ -243,6 +249,7 @@ func FastByte2String(bt []byte)string  {
 }
 
 //此函数的返回值不能修改
+
 func Utf8String(utf8Data uintptr,utf8Len int)string  {
 	var strHead reflect.StringHeader
 	strHead.Len = utf8Len
@@ -251,6 +258,7 @@ func Utf8String(utf8Data uintptr,utf8Len int)string  {
 }
 
 //返回值不能修改
+
 func Buffer2ByteSlice(Data uintptr,DataLen int)[]byte  {
 	var sliceHead reflect.SliceHeader
 	sliceHead.Len = DataLen
@@ -260,6 +268,7 @@ func Buffer2ByteSlice(Data uintptr,DataLen int)[]byte  {
 }
 //判断二进制数组是否是可打印的字符串,如果打印字符的的百分比超过了指定的printPercent， 认为是可显示的Plaintext
 //scanStyle 0 表示全扫描,1表示扫描头部10个rune,2表示扫描两头，3表示扫描前中尾
+
 func ByteSliceIsPrintString(Data []byte,scanStyle byte)bool  {
 	idx := 0
 	printC := 0
@@ -451,6 +460,7 @@ func FastString2Utf16Byte(s string)([]byte,error)  {
 }
 
 //将drwxrwx这些转化为 FileMode
+
 func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 	result = os.ModePerm
 	filemodebytes := []byte(permStr)
@@ -532,6 +542,7 @@ func ModePermStr2FileMode(permStr string)(result os.FileMode)  {
 
 
 //将内容转义成Json字符串
+
 func EscapeJsonStr(str string,EscapeUnicode bool) string {
 	return FastByte2String(EscapeJsonbyte(str,EscapeUnicode,nil))
 }
