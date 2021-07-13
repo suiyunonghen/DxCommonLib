@@ -282,7 +282,7 @@ func ByteSliceIsPrintString(Data []byte,scanStyle byte)bool  {
 			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
 				idx += l
 				runeCount++
-				if unicode.IsPrint(r){
+				if r == 13 || r == 10 || r == 9 || unicode.IsPrint(r){
 					printC++
 				}else if l != DataLen - 1{
 					//中间有不可显示的字符
@@ -304,7 +304,7 @@ func ByteSliceIsPrintString(Data []byte,scanStyle byte)bool  {
 			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
 				idx += l
 				runeCount++
-				if unicode.IsPrint(r){
+				if r == 13 || r == 10 || r == 9 || unicode.IsPrint(r){
 					printC++
 				}else if l != DataLen - 1{
 					//中间有不可显示的字符
@@ -333,7 +333,7 @@ func ByteSliceIsPrintString(Data []byte,scanStyle byte)bool  {
 			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
 				idx += l
 				runeCount++
-				if unicode.IsPrint(r){
+				if r == 13 || r == 10 || r == 9 || unicode.IsPrint(r){
 					printC++
 				}else if l != DataLen - 1{
 					//中间有不可显示的字符
@@ -358,7 +358,7 @@ func ByteSliceIsPrintString(Data []byte,scanStyle byte)bool  {
 			if r,l := utf8.DecodeRune(Data[idx:]);l>0{
 				idx += l
 				runeCount++
-				if unicode.IsPrint(r){
+				if r == 13 || r == 10 || r == 9 || unicode.IsPrint(r){
 					printC++
 				}else if l != DataLen - 1{
 					//中间有不可显示的字符
