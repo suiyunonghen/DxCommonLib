@@ -36,10 +36,3 @@ func TestStringFromUtf8Pointer(t *testing.T) {
 	utf16ptr, _ := syscall.UTF16PtrFromString(str)
 	fmt.Println(StringFromUtf16Pointer(uintptr(unsafe.Pointer(utf16ptr)), 1024))
 }
-
-func TestUnEscapeStr(t *testing.T) {
-	//http%3A%2F%2Fwww.dxsoft.com%3Fgg%3D%E4%B8%8D%E5%BE%97%E9%97%B2
-	//://
-	str := "%3B"
-	fmt.Println(FastByte2String(UnEscapeStr([]byte(str))))
-}
