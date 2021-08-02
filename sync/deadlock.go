@@ -139,7 +139,11 @@ func (mutex *RWMutexEx)lock(lockMsg string,isRlock bool)  {
 	lckInfo.BeforeFunc = beforeMethod
 	lckInfo.BeforeCaller = before
 	lockChan <- lckInfo
-	mutex.RWMutex.Lock()
+	if isRlock{
+		mutex.RWMutex.RLock()
+	}else{
+		mutex.RWMutex.Lock()
+	}
 	lckInfo = lockPool.Get().(*LockInfo)
 	lckInfo.IsRLock = isRlock
 	lckInfo.LockStyle = LckLocking
@@ -164,7 +168,7 @@ func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 
 func (mutex *RWMutexEx)RLock()  {
 	if atomic.LoadInt32(&deadCheck) == 0{
-		mutex.RWMutex.Lock()
+		mutex.RWMutex.RLock()
 		return
 	}
 	mutex.lock("",true)
