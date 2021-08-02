@@ -113,7 +113,11 @@ type RWMutexEx struct {
 	sync.RWMutex
 }
 
-func (mutex *RWMutexEx)Lock(lockMsg string)  {
+func (mutex *RWMutexEx)Lock()  {
+	mutex.LockWithMsg("")
+}
+
+func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 	if atomic.LoadInt32(&deadCheck) == 0{
 		mutex.RWMutex.Lock()
 		return
@@ -144,7 +148,11 @@ func (mutex *RWMutexEx)Lock(lockMsg string)  {
 	lockChan <- lckInfo
 }
 
-func (mutex *RWMutexEx)RLock(lockMsg string)  {
+func (mutex *RWMutexEx)RLock()  {
+	mutex.RLockWithMsg("")
+}
+
+func (mutex *RWMutexEx)RLockWithMsg(lockMsg string)  {
 	if atomic.LoadInt32(&deadCheck) == 0{
 		mutex.RWMutex.RLock()
 		return
@@ -221,7 +229,11 @@ type MutexEx struct {
 	sync.Mutex
 }
 
-func (mutex *MutexEx)Lock(lockMsg string)  {
+func (mutex *MutexEx)Lock()  {
+	mutex.LockWithMsg("")
+}
+
+func (mutex *MutexEx)LockWithMsg(lockMsg string)  {
 	if atomic.LoadInt32(&deadCheck) == 0{
 		mutex.Mutex.Lock()
 		return
@@ -237,6 +249,7 @@ func (mutex *MutexEx)Lock(lockMsg string)  {
 	lckInfo.StartTime = time.Now()
 	lckInfo.GoRoutine = gid
 	lckInfo.Caller = caller
+	lckInfo.LockMsg = lockMsg
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
 	lockChan <- lckInfo
@@ -248,6 +261,7 @@ func (mutex *MutexEx)Lock(lockMsg string)  {
 	lckInfo.LockStyle = LckLocking
 	lckInfo.StartTime = time.Now()
 	lckInfo.GoRoutine = gid
+	lckInfo.LockMsg = lockMsg
 	lckInfo.Caller = caller
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
@@ -279,9 +293,9 @@ var deadCheck int32
 var quitDeadCheck chan struct{}
 
 
-func StartDeadCheck(lockNotify func(deadLockInfo []byte),checkInterval,maxLockInterval time.Duration,debugLog func(format string,data ...interface{}))  {
+func StartDeadCheck(lockNotify func(deadLockInfo []byte),checkInterval,maxLockInterval time.Duration,debugLog func(panicMsg bool, format string,data ...interface{}))  {
 	if debugLog != nil{
-		debugLog("启动DeadLock检查")
+		debugLog(false,"启动DeadLock检查")
 	}
 	atomic.StoreInt32(&deadCheck,1)
 	quitDeadCheck = make(chan struct{})
@@ -300,7 +314,7 @@ func init()  {
 	lockChan = make(chan *LockInfo,256)
 }
 
-func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duration,lockNotify func(deadLockInfo []byte),debugLog func(format string,data ...interface{}))  {
+func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duration,lockNotify func(deadLockInfo []byte),debugLog func(panicMsg bool,format string,data ...interface{}))  {
 	var lockWaits sync.Map		//一般锁都会在全局用到，所以删除的概率比较小
 	locking := make([]*LockInfo,0,1024)
 	if checkInterval < time.Second * 5{
@@ -321,11 +335,26 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 					lockWait = make([]*LockInfo,0,1024)
 				}else{
 					lockWait = wait.([]*LockInfo)
+					for i := range lockWait{
+						if lockWait[i].GoRoutine == lckInfo.GoRoutine{
+							//同一个goroutine多次执行锁定
+							if debugLog != nil{
+								debugLog(true,"同一goroutine锁定1：%s,当前重入锁定2：%s",lockWait[i].String(),lckInfo.String())
+							}
+							return
+						}
+					}
 				}
 				lockWait = append(lockWait,lckInfo)
 				lockWaits.Store(lckInfo.Owner,lockWait)
 			case LckLocking:
 				//将上次的LockWait的释放掉
+				if lckInfo.Owner.locking != nil{
+					if debugLog != nil{
+						debugLog(true,"已经锁定：%s,当前重入锁定：%s",lckInfo.Owner.locking.String(),lckInfo.String())
+						return
+					}
+				}
 				if wait,ok := lockWaits.Load(lckInfo.Owner);ok{
 					var lastLock *LockInfo
 					lockWait := wait.([]*LockInfo)
@@ -367,7 +396,7 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 					}
 				}
 				if foundLock == nil && debugLog != nil{
-					debugLog("未找到在同一goroutine的成对释放%s",lckInfo.String())
+					debugLog(true,"未找到在同一goroutine的成对释放%s",lckInfo.String())
 				}
 			}
 		case <-tk:
@@ -417,7 +446,7 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 				if lockNotify != nil{
 					lockNotify(buffer)
 				}else if debugLog != nil{
-					debugLog(DxCommonLib.FastByte2String(buffer))
+					debugLog(false,DxCommonLib.FastByte2String(buffer))
 				}
 			}
 			tk = DxCommonLib.After(checkInterval)
