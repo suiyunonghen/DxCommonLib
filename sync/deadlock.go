@@ -116,20 +116,19 @@ type RWMutexEx struct {
 }
 
 func (mutex *RWMutexEx)Lock()  {
-	mutex.LockWithMsg("")
-}
-
-func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 	if atomic.LoadInt32(&deadCheck) == 0{
 		mutex.RWMutex.Lock()
 		return
 	}
-	//先获取当前的位置
+	mutex.lock("",false)
+}
+
+func (mutex *RWMutexEx)lock(lockMsg string,isRlock bool)  {
 	gid := system.GetRoutineId()
-	caller,method := mutex.caller(0)
-	before,beforeMethod := mutex.caller(1) //调用位置
+	caller,method := mutex.caller(1)
+	before,beforeMethod := mutex.caller(2) //调用位置
 	lckInfo := lockPool.Get().(*LockInfo)
-	lckInfo.IsRLock = false
+	lckInfo.IsRLock = isRlock
 	lckInfo.LockStyle = LckLockBlock	//lockWait
 	lckInfo.StartTime = time.Now()
 	lckInfo.GoRoutine = gid
@@ -142,7 +141,7 @@ func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 	lockChan <- lckInfo
 	mutex.RWMutex.Lock()
 	lckInfo = lockPool.Get().(*LockInfo)
-	lckInfo.IsRLock = false
+	lckInfo.IsRLock = isRlock
 	lckInfo.LockStyle = LckLocking
 	lckInfo.StartTime = time.Now()
 	lckInfo.GoRoutine = gid
@@ -155,8 +154,20 @@ func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 	lockChan <- lckInfo
 }
 
+func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
+	if atomic.LoadInt32(&deadCheck) == 0{
+		mutex.RWMutex.Lock()
+		return
+	}
+	mutex.lock(lockMsg,false)
+}
+
 func (mutex *RWMutexEx)RLock()  {
-	mutex.RLockWithMsg("")
+	if atomic.LoadInt32(&deadCheck) == 0{
+		mutex.RWMutex.Lock()
+		return
+	}
+	mutex.lock("",true)
 }
 
 func (mutex *RWMutexEx)RLockWithMsg(lockMsg string)  {
@@ -164,36 +175,7 @@ func (mutex *RWMutexEx)RLockWithMsg(lockMsg string)  {
 		mutex.RWMutex.RLock()
 		return
 	}
-	gid := system.GetRoutineId()
-	caller,method := mutex.caller(0)
-	before,beforeMethod := mutex.caller(1) //调用位置
-	lckInfo := lockPool.Get().(*LockInfo)
-	lckInfo.IsRLock = true
-	lckInfo.LockStyle = LckLockBlock	//lockWait
-	lckInfo.StartTime = time.Now()
-	lckInfo.GoRoutine = gid
-	lckInfo.Caller = caller
-	lckInfo.LockMsg = lockMsg
-	lckInfo.Owner = &mutex.mutexStruct
-	lckInfo.CallerFunc = method
-	lckInfo.BeforeFunc = beforeMethod
-	lckInfo.BeforeCaller = before
-	lockChan <- lckInfo
-
-	mutex.RWMutex.RLock()
-
-	lckInfo = lockPool.Get().(*LockInfo)
-	lckInfo.IsRLock = true
-	lckInfo.LockStyle = LckLocking
-	lckInfo.StartTime = time.Now()
-	lckInfo.GoRoutine = gid
-	lckInfo.LockMsg = lockMsg
-	lckInfo.Caller = caller
-	lckInfo.Owner = &mutex.mutexStruct
-	lckInfo.CallerFunc = method
-	lckInfo.BeforeFunc = beforeMethod
-	lckInfo.BeforeCaller = before
-	lockChan <- lckInfo
+	mutex.lock(lockMsg,true)
 }
 
 func (mutex *RWMutexEx)Unlock()  {
@@ -242,7 +224,11 @@ type MutexEx struct {
 }
 
 func (mutex *MutexEx)Lock()  {
-	mutex.LockWithMsg("")
+	if atomic.LoadInt32(&deadCheck) == 0{
+		mutex.Mutex.Lock()
+		return
+	}
+	mutex.lock("")
 }
 
 func (mutex *MutexEx)LockWithMsg(lockMsg string)  {
@@ -250,10 +236,14 @@ func (mutex *MutexEx)LockWithMsg(lockMsg string)  {
 		mutex.Mutex.Lock()
 		return
 	}
+	mutex.lock(lockMsg)
+}
+
+func (mutex *MutexEx)lock(lockMsg string)  {
 	//先获取当前的位置
 	gid := system.GetRoutineId()
-	caller,method := mutex.caller(0)
-	before,beforeMethod := mutex.caller(1) //调用位置
+	caller,method := mutex.caller(1)
+	before,beforeMethod := mutex.caller(2) //调用位置
 
 	lckInfo := lockPool.Get().(*LockInfo)
 	lckInfo.IsRLock = false
