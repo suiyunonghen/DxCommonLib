@@ -71,6 +71,8 @@ type LockInfo struct {
 	LockMsg			string
 	Caller			string			//调用Lock的位置
 	CallerFunc		string			//调用Lock的函数
+	BeforeCaller	string			//前一步调用
+	BeforeFunc		string			//前一步调用
 	Owner			*mutexStruct
 }
 
@@ -125,6 +127,7 @@ func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 	//先获取当前的位置
 	gid := system.GetRoutineId()
 	caller,method := mutex.caller(0)
+	before,beforeMethod := mutex.caller(1) //调用位置
 	lckInfo := lockPool.Get().(*LockInfo)
 	lckInfo.IsRLock = false
 	lckInfo.LockStyle = LckLockBlock	//lockWait
@@ -134,6 +137,8 @@ func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 	lckInfo.Caller = caller
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
+	lckInfo.BeforeFunc = beforeMethod
+	lckInfo.BeforeCaller = before
 	lockChan <- lckInfo
 	mutex.RWMutex.Lock()
 	lckInfo = lockPool.Get().(*LockInfo)
@@ -145,6 +150,8 @@ func (mutex *RWMutexEx)LockWithMsg(lockMsg string)  {
 	lckInfo.Caller = caller
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
+	lckInfo.BeforeFunc = beforeMethod
+	lckInfo.BeforeCaller = before
 	lockChan <- lckInfo
 }
 
@@ -159,6 +166,7 @@ func (mutex *RWMutexEx)RLockWithMsg(lockMsg string)  {
 	}
 	gid := system.GetRoutineId()
 	caller,method := mutex.caller(0)
+	before,beforeMethod := mutex.caller(1) //调用位置
 	lckInfo := lockPool.Get().(*LockInfo)
 	lckInfo.IsRLock = true
 	lckInfo.LockStyle = LckLockBlock	//lockWait
@@ -168,6 +176,8 @@ func (mutex *RWMutexEx)RLockWithMsg(lockMsg string)  {
 	lckInfo.LockMsg = lockMsg
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
+	lckInfo.BeforeFunc = beforeMethod
+	lckInfo.BeforeCaller = before
 	lockChan <- lckInfo
 
 	mutex.RWMutex.RLock()
@@ -181,6 +191,8 @@ func (mutex *RWMutexEx)RLockWithMsg(lockMsg string)  {
 	lckInfo.Caller = caller
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
+	lckInfo.BeforeFunc = beforeMethod
+	lckInfo.BeforeCaller = before
 	lockChan <- lckInfo
 }
 
@@ -241,7 +253,7 @@ func (mutex *MutexEx)LockWithMsg(lockMsg string)  {
 	//先获取当前的位置
 	gid := system.GetRoutineId()
 	caller,method := mutex.caller(0)
-
+	before,beforeMethod := mutex.caller(1) //调用位置
 
 	lckInfo := lockPool.Get().(*LockInfo)
 	lckInfo.IsRLock = false
@@ -252,6 +264,8 @@ func (mutex *MutexEx)LockWithMsg(lockMsg string)  {
 	lckInfo.LockMsg = lockMsg
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
+	lckInfo.BeforeFunc = beforeMethod
+	lckInfo.BeforeCaller = before
 	lockChan <- lckInfo
 
 	mutex.Mutex.Lock()
@@ -265,6 +279,8 @@ func (mutex *MutexEx)LockWithMsg(lockMsg string)  {
 	lckInfo.Caller = caller
 	lckInfo.Owner = &mutex.mutexStruct
 	lckInfo.CallerFunc = method
+	lckInfo.BeforeFunc = beforeMethod
+	lckInfo.BeforeCaller = before
 	lockChan <- lckInfo
 }
 
@@ -416,8 +432,13 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 					buffer = strconv.AppendInt(buffer,locking[i].GoRoutine,10)
 					buffer = append(buffer,",锁定位置:"...)
 					buffer = append(buffer,locking[i].Caller...)
-					buffer = append(buffer,",调用函数:"...)
+					buffer = append(buffer,'.')
 					buffer = append(buffer,locking[i].CallerFunc...)
+					buffer = append(buffer," from "...)
+					buffer = append(buffer,locking[i].BeforeCaller...)
+					buffer = append(buffer,'.')
+					buffer = append(buffer,locking[i].BeforeFunc...)
+
 					buffer = append(buffer,",调用消息："...)
 					buffer = append(buffer,locking[i].LockMsg...)
 					if waits,ok := lockWaits.Load(locking[i].Owner);ok{
@@ -430,8 +451,14 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 							buffer = strconv.AppendInt(buffer,lockWait[waitIndex].GoRoutine,10)
 							buffer = append(buffer,",等待位置:"...)
 							buffer = append(buffer,lockWait[waitIndex].Caller...)
-							buffer = append(buffer,",调用函数:"...)
+							buffer = append(buffer,'.')
 							buffer = append(buffer,lockWait[waitIndex].CallerFunc...)
+
+							buffer = append(buffer," from "...)
+							buffer = append(buffer,lockWait[waitIndex].BeforeCaller...)
+							buffer = append(buffer,'.')
+							buffer = append(buffer,lockWait[waitIndex].BeforeFunc...)
+
 							buffer = append(buffer,",调用消息："...)
 							buffer = append(buffer,lockWait[waitIndex].LockMsg...)
 							buffer = append(buffer,[]byte{'\r','\n'}...)
@@ -440,6 +467,7 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 				}
 			}
 			if willPanic{
+
 				panic(DxCommonLib.FastByte2String(buffer))
 			}
 			if len(buffer) > 0{
