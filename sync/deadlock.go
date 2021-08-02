@@ -457,7 +457,10 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 				}
 			}
 			if willPanic{
-
+				if debugLog != nil{
+					debugLog(true,DxCommonLib.FastByte2String(buffer))
+					return
+				}
 				panic(DxCommonLib.FastByte2String(buffer))
 			}
 			if len(buffer) > 0{
