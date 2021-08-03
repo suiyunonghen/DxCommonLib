@@ -359,12 +359,6 @@ func checkDeadLock(quit chan struct{},checkInterval,maxLockInterval time.Duratio
 				lockWaits.Store(lckInfo.Owner,lockWait)
 			case LckLocking:
 				//将上次的LockWait的释放掉
-				if lckInfo.Owner.locking != nil{
-					if debugLog != nil{
-						debugLog(true,"已经锁定：%s,当前重入锁定：%s",lckInfo.Owner.locking.String(),lckInfo.String())
-						return
-					}
-				}
 				if wait,ok := lockWaits.Load(lckInfo.Owner);ok{
 					var lastLock *LockInfo
 					lockWait := wait.([]*LockInfo)
