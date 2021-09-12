@@ -1,3 +1,5 @@
+//from:  https://github.com/rpccloud/goid
+
 package system
 
 import (
