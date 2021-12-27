@@ -74,6 +74,7 @@ func (mapType *MapType)ValueMapType()*MapType  {
 	return nil
 }
 
+
 func (mapType *MapType)CreateValueMap()*reflect.Value  {
 	if mapType.elem.Kind() == reflect.Map{
 		valueType := (*MapType)(unsafe.Pointer(mapType.elem))
