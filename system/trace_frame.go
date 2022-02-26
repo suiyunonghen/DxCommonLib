@@ -15,6 +15,9 @@ func TraceFrame2Buffer(frameC int, buffer *bytes.Buffer) {
 		if pc, file, line, ok := runtime.Caller(i); !ok {
 			break
 		} else {
+			if strings.HasPrefix(file,"runtime/") || strings.Index(file,"!dx!common!lib@") > 0{
+				break
+			}
 			if i > 1 {
 				buffer.Write([]byte{'\r', '\n'})
 			}
@@ -38,6 +41,9 @@ func TraceFrame2Buffer(frameC int, buffer *bytes.Buffer) {
 			}
 			buffer.WriteByte('.')
 			buffer.WriteString(funcName)
+			if strings.Index(file,"/main.go")>0{
+				break
+			}
 		}
 	}
 }
@@ -50,12 +56,14 @@ func TraceFrame(frameC int, bt []byte) []byte {
 		if pc, file, line, ok := runtime.Caller(i); !ok {
 			break
 		} else {
+			if strings.HasPrefix(file,"runtime/") || strings.Index(file,"!dx!common!lib@") > 0{
+				break
+			}
 			if i > 1 {
 				bt = append(bt, '\r', '\n')
 			}
 			idx := strings.LastIndexByte(file, '/')
 			if idx == -1 {
-				//buffer.WriteString(file)
 				bt = append(bt, file...)
 			} else {
 				idx = strings.LastIndexByte(file[:idx], '/')
@@ -74,6 +82,9 @@ func TraceFrame(frameC int, bt []byte) []byte {
 			}
 			bt = append(bt, '.')
 			bt = append(bt, funcName...)
+			if strings.Index(file,"/main.go")>0{
+				break
+			}
 		}
 	}
 	return bt
