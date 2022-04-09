@@ -6,34 +6,34 @@ QQ:75492895
 package DxCommonLib
 
 import (
-	"sync"
 	"runtime"
+	"sync"
 	"time"
 )
 
 type (
-	//任务
+	//ITaskRunner 任务
 	ITaskRunner interface {
 		Run()
 	}
 
 	GWorkerFunc func(data ...interface{})
 	GWorkers    struct {
-		fMaxWorkersCount		int				//能同时存在的最多线程个数
-		fMaxWorkerIdleTime		time.Duration	//线程能空闲的最长时间，超过这个时间了会回收掉这个线程
-		ready 					[]*workerChan   //准备好的空闲线程
-		lock           	   		sync.Mutex
-		workerChanPool 			sync.Pool		//工作者
-		deftaskrunnerPool		sync.Pool		//默认任务
-		mustStop				bool
-		fstopchan  				chan struct{}
-		workersCount 			int
+		fMaxWorkersCount   int           //能同时存在的最多线程个数
+		fMaxWorkerIdleTime time.Duration //线程能空闲的最长时间，超过这个时间了会回收掉这个线程
+		ready              []*workerChan //准备好的空闲线程
+		lock               sync.Mutex
+		workerChanPool     sync.Pool //工作者
+		deftaskrunnerPool  sync.Pool //默认任务
+		mustStop           bool
+		fstopchan          chan struct{}
+		workersCount       int
 	}
 
 	workerChan struct {
-		lastUseTime		time.Time
-		fOwner			*GWorkers
-		fcurTask		chan ITaskRunner
+		lastUseTime time.Time
+		fOwner      *GWorkers
+		fcurTask    chan ITaskRunner
 	}
 
 	defTaskRunner struct {
@@ -54,7 +54,7 @@ func (workers *GWorkers) Start() {
 	stopCh := workers.fstopchan
 	workers.workerChanPool.New = func() interface{} {
 		return &workerChan{
-			fOwner:workers,
+			fOwner:   workers,
 			fcurTask: make(chan ITaskRunner, workerChanCap),
 		}
 	}
@@ -65,12 +65,11 @@ func (workers *GWorkers) Start() {
 			case <-stopCh:
 				return
 			case <-After(workers.fMaxWorkerIdleTime):
-				workers.clean(&scratch)//定时执行清理回收线程
+				workers.clean(&scratch) //定时执行清理回收线程
 			}
 		}
 	}()
 }
-
 
 func (workers *GWorkers) Stop() {
 	if workers.fstopchan == nil {
@@ -85,7 +84,7 @@ func (workers *GWorkers) Stop() {
 	workers.lock.Lock()
 	ready := workers.ready
 	l := len(ready)
-	for i:=0;i<l;i++{
+	for i := 0; i < l; i++ {
 		ready[i].fcurTask <- nil
 		ready[i] = nil
 	}
@@ -93,7 +92,6 @@ func (workers *GWorkers) Stop() {
 	workers.mustStop = true
 	workers.lock.Unlock()
 }
-
 
 var workerChanCap = func() int {
 	// Use blocking workerChan if GOMAXPROCS=1.
@@ -149,7 +147,7 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 	// are located on non-local CPUs.
 	tmp := *scratch
 	l = len(tmp)
-	for i:=0;i< l;i++{
+	for i := 0; i < l; i++ {
 		tmp[i].fcurTask <- nil
 		tmp[i] = nil
 	}
@@ -200,7 +198,6 @@ func (workers *GWorkers) release(ch *workerChan) bool {
 	return true
 }
 
-
 func (workers *GWorkers) workerFunc(ch *workerChan) {
 	for curTask := range ch.fcurTask {
 		if curTask == nil {
@@ -221,7 +218,7 @@ func (workers *GWorkers) workerFunc(ch *workerChan) {
 	workers.lock.Unlock()
 }
 
-func (workers *GWorkers)PostFunc(routineFunc GWorkerFunc,params ...interface{})bool  {
+func (workers *GWorkers) PostFunc(routineFunc GWorkerFunc, params ...interface{}) bool {
 	wch := workers.getCh()
 	if wch != nil {
 		taskrunner := workers.deftaskrunnerPool.Get().(*defTaskRunner)
@@ -233,10 +230,10 @@ func (workers *GWorkers)PostFunc(routineFunc GWorkerFunc,params ...interface{})b
 	return false
 }
 
-//必须异步执行到
-func (workers *GWorkers)MustRunAsync(routineFunc GWorkerFunc,params ...interface{})  {
-	for idx := 0;idx<=4;idx++{
-		if workers.PostFunc(routineFunc,params...){
+//MustRunAsync 必须异步执行到
+func (workers *GWorkers) MustRunAsync(routineFunc GWorkerFunc, params ...interface{}) {
+	for idx := 0; idx <= 4; idx++ {
+		if workers.PostFunc(routineFunc, params...) {
 			return
 		}
 		runtime.Gosched()
@@ -244,15 +241,15 @@ func (workers *GWorkers)MustRunAsync(routineFunc GWorkerFunc,params ...interface
 	go routineFunc(params...)
 }
 
-func (workers *GWorkers)TryPostAndRun(routineFunc GWorkerFunc,params ...interface{})bool  {
-	if workers.PostFunc(routineFunc,params...){
+func (workers *GWorkers) TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) bool {
+	if workers.PostFunc(routineFunc, params...) {
 		return true
 	}
 	routineFunc(params...)
 	return false
 }
 
-func (workers *GWorkers)Post(runner ITaskRunner)bool  {
+func (workers *GWorkers) Post(runner ITaskRunner) bool {
 	wch := workers.getCh()
 	if wch != nil {
 		wch.fcurTask <- runner
@@ -282,44 +279,44 @@ func NewWorkers(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)
 
 var defWorkers *GWorkers
 
-func ResetDefaultWorker(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration)  {
-	if defWorkers != nil{
+func ResetDefaultWorker(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration) {
+	if defWorkers != nil {
 		defWorkers.Stop()
 	}
-	defWorkers = NewWorkers(maxGoroutinesAmount,maxGoroutineIdleDuration)
+	defWorkers = NewWorkers(maxGoroutinesAmount, maxGoroutineIdleDuration)
 }
 
-func PostFunc(routineFunc GWorkerFunc,params ...interface{})bool  {
-	if defWorkers == nil{
-		defWorkers = NewWorkers(0,0)
+func PostFunc(routineFunc GWorkerFunc, params ...interface{}) bool {
+	if defWorkers == nil {
+		defWorkers = NewWorkers(0, 0)
 	}
-	return defWorkers.PostFunc(routineFunc,params...)
+	return defWorkers.PostFunc(routineFunc, params...)
 }
 
-func TryPostAndRun(routineFunc GWorkerFunc,params ...interface{})bool  {
-	if defWorkers == nil{
-		defWorkers = NewWorkers(0,0)
+func TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) bool {
+	if defWorkers == nil {
+		defWorkers = NewWorkers(0, 0)
 	}
-	return defWorkers.TryPostAndRun(routineFunc,params...)
+	return defWorkers.TryPostAndRun(routineFunc, params...)
 }
 
-//必须异步执行到
-func MustRunAsync(routineFunc GWorkerFunc,params ...interface{})  {
-	if defWorkers == nil{
-		defWorkers = NewWorkers(0,0)
+//MustRunAsync 必须异步执行到
+func MustRunAsync(routineFunc GWorkerFunc, params ...interface{}) {
+	if defWorkers == nil {
+		defWorkers = NewWorkers(0, 0)
 	}
-	defWorkers.MustRunAsync(routineFunc,params...)
+	defWorkers.MustRunAsync(routineFunc, params...)
 }
 
-func Post(runner ITaskRunner)  {
-	if defWorkers == nil{
-		defWorkers = NewWorkers(0,0)
+func Post(runner ITaskRunner) {
+	if defWorkers == nil {
+		defWorkers = NewWorkers(0, 0)
 	}
 	defWorkers.Post(runner)
 }
 
-func StopWorkers()  {
-	if defWorkers != nil{
+func StopWorkers() {
+	if defWorkers != nil {
 		defWorkers.Stop()
 	}
 }

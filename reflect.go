@@ -11,7 +11,8 @@ import (
 	"strconv"
 )
 
-func IsSimpleCopyKind(kind reflect.Kind)bool  {
+//IsSimpleCopyKind 是否是简单的可copy的类型
+func IsSimpleCopyKind(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.String, reflect.Int, reflect.Int64, reflect.Int8, reflect.Int16, reflect.Int32,
 		reflect.Uint, reflect.Uint64, reflect.Uint8, reflect.Uint16, reflect.Uint32,
@@ -22,33 +23,33 @@ func IsSimpleCopyKind(kind reflect.Kind)bool  {
 	}
 }
 
-/*
+/*CanConvertStructField
 field1->是否能够 匹配field2字段
- */
-func CanConvertStructField(field1,field2 *reflect.StructField) bool {
-	if field1.Type != field2.Type{
+*/
+func CanConvertStructField(field1, field2 *reflect.StructField) bool {
+	if field1.Type != field2.Type {
 		f1Kind := field1.Type.Kind()
-		if field1.Type.Kind() == reflect.Interface{
+		if field1.Type.Kind() == reflect.Interface {
 			return false
 		}
 		f2Kind := field2.Type.Kind()
 		switch f1Kind {
 		case reflect.Map:
-			if f2Kind != reflect.Map && f2Kind != reflect.Struct{
+			if f2Kind != reflect.Map && f2Kind != reflect.Struct {
 				return false
 			}
 		case reflect.Struct:
-			if f2Kind != reflect.Map && f2Kind != reflect.Struct{
+			if f2Kind != reflect.Map && f2Kind != reflect.Struct {
 				return false
 			}
-			if f2Kind == reflect.Map && field2.Type.Key().Kind() != reflect.String{
+			if f2Kind == reflect.Map && field2.Type.Key().Kind() != reflect.String {
 				return false
 			}
 		case reflect.Slice:
 			if f2Kind == reflect.Slice {
 				f1VKind := field1.Type.Elem().Kind()
 				f2VKind := field2.Type.Elem().Kind()
-				if f1VKind != f2VKind && f2VKind != reflect.Interface{
+				if f1VKind != f2VKind && f2VKind != reflect.Interface {
 					return false
 				}
 			}
@@ -56,30 +57,30 @@ func CanConvertStructField(field1,field2 *reflect.StructField) bool {
 			return false
 		}
 	}
-	if field1.Name == field2.Name{
+	if field1.Name == field2.Name {
 		return true
 	}
 	//再判定tag
 	tagMap1 := ParseStructTag(string(field1.Tag))
-	if tagMap1 != nil{
-		for _,v := range tagMap1{
-			if v == field2.Name{
+	if tagMap1 != nil {
+		for _, v := range tagMap1 {
+			if v == field2.Name {
 				return true
 			}
 		}
 	}
 	tagMap2 := ParseStructTag(string(field2.Tag))
-	if tagMap2 != nil{
-		for _,v := range tagMap2{
-			if v == field1.Name{
+	if tagMap2 != nil {
+		for _, v := range tagMap2 {
+			if v == field1.Name {
 				return true
 			}
 		}
 	}
-	if tagMap1 != nil && tagMap2 != nil{
-		for _,v := range tagMap1{
-			for _,v2 := range tagMap2{
-				if v == v2{
+	if tagMap1 != nil && tagMap2 != nil {
+		for _, v := range tagMap1 {
+			for _, v2 := range tagMap2 {
+				if v == v2 {
 					return true
 				}
 			}
@@ -88,9 +89,8 @@ func CanConvertStructField(field1,field2 *reflect.StructField) bool {
 	return false
 }
 
-//后续可以缓存起来
-
-func ParseStructTag(tag string)map[string]string  {
+//ParseStructTag 后续可以缓存起来
+func ParseStructTag(tag string) map[string]string {
 	var result map[string]string
 	for tag != "" {
 		// Skip leading space.
@@ -135,7 +135,7 @@ func ParseStructTag(tag string)map[string]string  {
 			result = nil
 			break
 		}
-		if result == nil{
+		if result == nil {
 			result = make(map[string]string)
 		}
 		result[name] = value
@@ -143,17 +143,17 @@ func ParseStructTag(tag string)map[string]string  {
 	return result
 }
 
-/*
+/*CanKeyMatchStructField
 key是否匹配field
- */
-func CanKeyMatchStructField(key string,field *reflect.StructField)bool  {
-	if key == field.Name{
+*/
+func CanKeyMatchStructField(key string, field *reflect.StructField) bool {
+	if key == field.Name {
 		return true
 	}
 	tagMap := ParseStructTag(string(field.Tag))
-	if tagMap != nil{
-		for _,v := range tagMap{
-			if v == key{
+	if tagMap != nil {
+		for _, v := range tagMap {
+			if v == key {
 				return true
 			}
 		}

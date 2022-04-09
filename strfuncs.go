@@ -25,13 +25,11 @@ import (
 	"unsafe"
 )
 
-//内存拷贝函数
-
+//CopyMemory 内存拷贝函数
 //go:linkname CopyMemory runtime.memmove
 func CopyMemory(to, from unsafe.Pointer, n uintptr)
 
-//清空内存
-
+//ZeroMemory 清空内存
 //go:linkname ZeroMemory runtime.memclrNoHeapPointers
 func ZeroMemory(ptr unsafe.Pointer, n uintptr)
 
@@ -47,8 +45,7 @@ func Ord(x bool) uint8 {
 	return *(*uint8)(unsafe.Pointer(&x))
 }
 
-//内存比较函数
-
+//CompareMem 内存比较函数
 func CompareMem(a, b unsafe.Pointer, size int) bool {
 	if size <= 0 {
 		return memequal_varlen(a, b)
@@ -124,8 +121,7 @@ func DelphiPcharLen(dstr uintptr) (result int32) {
 	return
 }
 
-//将常规的pchar返回到string
-
+//Pchar2String 将常规的pchar返回到string
 func Pchar2String(pcharstr uintptr) string {
 	if pcharstr == 0 {
 		return ""
@@ -140,21 +136,6 @@ func Pchar2String(pcharstr uintptr) string {
 		ptr = unsafe.Pointer(uintptr(ptr) + 2)
 	}
 	return string(utf16.Decode(gbt))
-}
-
-func StringFromUtf8Pointer(utf8Addr uintptr, maxlen int) string {
-	if utf8Addr == 0 {
-		return ""
-	}
-	for i := 0; i < maxlen; i++ {
-		mb := (*byte)(unsafe.Pointer(uintptr(uint(utf8Addr) + uint(i))))
-		if *mb == 0 {
-			resultb := make([]byte, i)
-			CopyMemory(unsafe.Pointer(&resultb[0]), unsafe.Pointer(utf8Addr), uintptr(i))
-			return string(resultb)
-		}
-	}
-	return ""
 }
 
 func StringFromUtf16Pointer(utf16Addr uintptr, maxlen int) string {
@@ -172,13 +153,13 @@ func StringFromUtf16Pointer(utf16Addr uintptr, maxlen int) string {
 	return ""
 }
 
-func FastPchar2String(pcharstr uintptr) string {
-	if pcharstr == 0 {
+func FastPchar2String(pcharStr uintptr) string {
+	if pcharStr == 0 {
 		return ""
 	}
 	s := new(reflect.SliceHeader)
-	s.Data = pcharstr
-	s.Len = PcharLen(pcharstr)
+	s.Data = pcharStr
+	s.Len = PcharLen(pcharStr)
 	s.Cap = s.Len
 	return string(utf16.Decode(*(*[]uint16)(unsafe.Pointer(s))))
 }
@@ -191,8 +172,7 @@ func FastPByte2ByteSlice(pByte uintptr, byteLen int) []byte {
 	return *(*[]byte)(unsafe.Pointer(s))
 }
 
-//将Delphi的Pchar转换到string,Unicode
-
+//DelphiPchar2String 将Delphi的Pchar转换到string,Unicode
 func DelphiPchar2String(dstr uintptr) string {
 	if dstr == 0 {
 		return ""
@@ -227,8 +207,7 @@ func FastBytes2Uint16s(bt []byte) []uint16 {
 	return *(*[]uint16)(unsafe.Pointer(sliceHead))
 }
 
-//本函数只作为强制转换使用，不可将返回的Slice再做修改处理
-
+//FastString2Byte 本函数只作为强制转换使用，不可将返回的Slice再做修改处理
 func FastString2Byte(str string) []byte {
 	strHead := (*reflect.StringHeader)(unsafe.Pointer(&str))
 	var sliceHead reflect.SliceHeader
@@ -247,8 +226,7 @@ func FastByte2String(bt []byte) string {
 	return *(*string)(unsafe.Pointer(&bt))
 }
 
-//此函数的返回值不能修改
-
+//Utf8String 此函数的返回值不能修改
 func Utf8String(utf8Data uintptr, utf8Len int) string {
 	var strHead reflect.StringHeader
 	strHead.Len = utf8Len
@@ -256,8 +234,7 @@ func Utf8String(utf8Data uintptr, utf8Len int) string {
 	return *(*string)(unsafe.Pointer(&strHead))
 }
 
-//返回值不能修改
-
+//Buffer2ByteSlice 返回值不能修改
 func Buffer2ByteSlice(Data uintptr, DataLen int) []byte {
 	var sliceHead reflect.SliceHeader
 	sliceHead.Len = DataLen
@@ -266,9 +243,9 @@ func Buffer2ByteSlice(Data uintptr, DataLen int) []byte {
 	return *(*[]byte)(unsafe.Pointer(&sliceHead))
 }
 
+//ByteSliceIsPrintString
 //判断二进制数组是否是可打印的字符串,如果打印字符的的百分比超过了指定的printPercent， 认为是可显示的Plaintext
 //scanStyle 0 表示全扫描,1表示扫描头部10个rune,2表示扫描两头，3表示扫描前中尾
-
 func ByteSliceIsPrintString(Data []byte, scanStyle byte) bool {
 	idx := 0
 	printC := 0
@@ -458,8 +435,7 @@ func FastString2Utf16Byte(s string) ([]byte, error) {
 	return *(*[]byte)(unsafe.Pointer(&sliceHead)), nil
 }
 
-//将drwxrwx这些转化为 FileMode
-
+//ModePermStr2FileMode 将drwxrwx这些转化为 FileMode
 func ModePermStr2FileMode(permStr string) (result os.FileMode) {
 	result = os.ModePerm
 	filemodebytes := []byte(permStr)
@@ -540,8 +516,7 @@ func ModePermStr2FileMode(permStr string) (result os.FileMode) {
 	return
 }
 
-//将内容转义成Json字符串
-
+//EscapeJsonStr 将内容转义成Json字符串
 func EscapeJsonStr(str string, EscapeUnicode bool) string {
 	return FastByte2String(EscapeJsonbyte(str, EscapeUnicode, nil))
 }
@@ -731,11 +706,12 @@ func UnEscapeStr(bvalue []byte, unEscapeUrl bool) []byte {
 	return buf
 }
 
-//解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
+//ParserEscapeStr 解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
 func ParserEscapeStr(bvalue []byte, unEscapeUrl bool) string {
 	return FastByte2String(UnEscapeStr(bvalue, unEscapeUrl))
 }
 
+//ParserJsonTime2Go
 //Date(1402384458000)
 //Date(1224043200000+0800)
 func ParserJsonTime2Go(jsontime string) time.Time {
@@ -805,7 +781,7 @@ var (
 	vhex = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
 )
 
-//2进制转到16进制
+//Binary2Hex 2进制转到16进制
 func Binary2Hex(bt []byte, dst []byte) []byte {
 	l := len(dst)
 	if len(dst) == 0 {
@@ -821,7 +797,7 @@ func Bin2Hex(bt []byte) string {
 	return FastByte2String(Binary2Hex(bt, nil))
 }
 
-//16进制到2进制
+//Hex2Binary 16进制到2进制
 func Hex2Binary(hexStr string) []byte {
 	if hexStr == "" {
 		return nil
@@ -838,7 +814,7 @@ func Hex2Binary(hexStr string) []byte {
 	return result
 }
 
-//From github.com/valyala/fastjson/tree/master/fastfloat
+//StrToIntDef From github.com/valyala/fastjson/tree/master/fastfloat
 func StrToIntDef(vstr string, defv int64) int64 {
 	if v, err := ParseInt64(vstr); err != nil {
 		return defv
@@ -1042,7 +1018,7 @@ func ParseFloat(s string) (float64, error) {
 	return 0, fmt.Errorf("cannot parse float64 from %q", s)
 }
 
-//From github.com/valyala/fastjson/tree/master/fastfloat
+//StrToUintDef From github.com/valyala/fastjson/tree/master/fastfloat
 func StrToUintDef(vstr string, defv uint64) uint64 {
 	vlen := uint(len(vstr))
 	if vlen == 0 {
@@ -1081,7 +1057,7 @@ var float64pow10 = [...]float64{
 	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22, 1e123, 1e124,
 }
 
-//github.com/valyala/fastjson/tree/master/fastfloat
+//StrToFloatDef github.com/valyala/fastjson/tree/master/fastfloat
 func StrToFloatDef(s string, defv float64) float64 {
 	vlen := uint(len(s))
 	if vlen == 0 {
