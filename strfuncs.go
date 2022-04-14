@@ -586,8 +586,7 @@ func EscapeJsonbyte(str string, EscapeUnicode bool, dst []byte) []byte {
 	return dst
 }
 
-func UnEscapeStr(bvalue []byte, unEscapeUrl bool) []byte {
-	buf := make([]byte, 0, 256)
+func UnEscapeStr(bvalue []byte, unEscapeUrl bool, buf []byte) []byte {
 	blen := len(bvalue)
 	i := 0
 	unicodeidx := 0
@@ -707,8 +706,8 @@ func UnEscapeStr(bvalue []byte, unEscapeUrl bool) []byte {
 }
 
 //ParserEscapeStr 解码转义字符，将"\u6821\u56ed\u7f51\t02%20得闲"这类字符串，解码成正常显示的字符串
-func ParserEscapeStr(bvalue []byte, unEscapeUrl bool) string {
-	return FastByte2String(UnEscapeStr(bvalue, unEscapeUrl))
+func ParserEscapeStr(bvalue []byte, unEscapeUrl bool, buf []byte) string {
+	return FastByte2String(UnEscapeStr(bvalue, unEscapeUrl, buf))
 }
 
 //ParserJsonTime2Go
