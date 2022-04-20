@@ -112,15 +112,6 @@ func PcharLen(dstr uintptr) int {
 	return 0
 }
 
-func DelphiPcharLen(dstr uintptr) (result int32) {
-	//Delphi字符串的地址的-4地址位置为长度
-	if dstr == 0 {
-		return 0
-	}
-	result = *(*int32)(unsafe.Pointer(dstr - 4))
-	return
-}
-
 //Pchar2String 将常规的pchar返回到string
 func Pchar2String(pcharstr uintptr) string {
 	if pcharstr == 0 {
@@ -172,32 +163,61 @@ func FastPByte2ByteSlice(pByte uintptr, byteLen int) []byte {
 	return *(*[]byte)(unsafe.Pointer(s))
 }
 
-//DelphiPchar2String 将Delphi的Pchar转换到string,Unicode
-func DelphiPchar2String(dstr uintptr) string {
-	if dstr == 0 {
-		return ""
+//DelphiStringLen 获取Delphi字符串的长度
+func DelphiStringLen(delphiString uintptr) (result int32) {
+	//Delphi字符串的地址的-4地址位置为长度
+	if delphiString == 0 {
+		return 0
 	}
-	ptr := unsafe.Pointer(dstr)
-	gbt := make([]uint16, DelphiPcharLen(dstr))
-	for i := 0; ; i++ {
-		if 0 == *(*uint16)(ptr) {
-			break
-		}
-		gbt[i] = *(*uint16)(ptr)
-		ptr = unsafe.Pointer(uintptr(ptr) + 2)
-	}
-	return string(utf16.Decode(gbt))
+	result = *(*int32)(unsafe.Pointer(delphiString - 4))
+	return
 }
 
-func FastDelphiPchar2String(pcharstr uintptr) string {
-	if pcharstr == 0 {
+/*
+FastDelphiString2String 将Delphi的字符串转为Go字符串
+因为实际上Delphi的字符串，就是一个指针，这个指针的指向是数据位置，-4位置是长度，-8位置是引用计数，-10位置是每个字符占位个数，-12位置表示的是CodePage编码页
+以上是对Unicode的Delphi的，如果是DXE之后的版本就只有到-8，有长度和引用计数，后面的都没有
+*/
+func FastDelphiString2String(delphiString uintptr, unicodeDelphi bool) string {
+	if delphiString == 0 {
 		return ""
 	}
-	s := new(reflect.SliceHeader)
-	s.Data = pcharstr
-	s.Len = int(DelphiPcharLen(pcharstr) * 2)
-	s.Cap = s.Len
-	return string(utf16.Decode(*(*[]uint16)(unsafe.Pointer(s))))
+	dataLen := *(*int32)(unsafe.Pointer(delphiString - 4))
+	if dataLen == 0 {
+		return ""
+	}
+	var codePage uint16
+	if unicodeDelphi {
+		codePage = *(*uint16)(unsafe.Pointer(delphiString - 12))
+	} else {
+		codePage = 936
+	}
+	switch codePage {
+	case 1200:
+		//UTF16编码页
+		s := new(reflect.SliceHeader)
+		s.Data = delphiString
+		s.Len = int(dataLen * 2)
+		s.Cap = s.Len
+		return string(utf16.Decode(*(*[]uint16)(unsafe.Pointer(s))))
+	case 65001:
+		//是UTF8的，那么直接开整
+		s := make([]byte, dataLen)
+		CopyMemory(unsafe.Pointer(&s[0]), unsafe.Pointer(delphiString), uintptr(dataLen))
+		return *(*string)(unsafe.Pointer(&s))
+	case 936, 20936:
+		//gbk的
+		s := new(reflect.SliceHeader)
+		s.Data = delphiString
+		s.Len = int(dataLen)
+		s.Cap = s.Len
+		if resultUtf8, err := GBK2Utf8(*(*[]byte)(unsafe.Pointer(s))); err == nil {
+			return *(*string)(unsafe.Pointer(&resultUtf8))
+		}
+	case 950:
+		//繁体中文
+	}
+	return ""
 }
 
 func FastBytes2Uint16s(bt []byte) []uint16 {
