@@ -32,7 +32,7 @@ type (
 		maxTimeout time.Duration
 		quitchan   chan struct{}
 		interval   time.Duration
-		tkfunc     func()
+		//tkfunc     func()
 		recordPool sync.Pool
 	}
 )
@@ -57,7 +57,7 @@ func init() {
 // NewTimeWheelWorker
 // interval指定调度的时间间隔
 // slotBlockCount指定时间轮的块长度
-func NewTimeWheelWorker(interval time.Duration, slotBlockCount int32, tkfunc func()) *TimeWheelWorker {
+func NewTimeWheelWorker(interval time.Duration, slotBlockCount int32) *TimeWheelWorker {
 	if interval < minTickerInterval {
 		interval = minTickerInterval
 	}
@@ -65,7 +65,7 @@ func NewTimeWheelWorker(interval time.Duration, slotBlockCount int32, tkfunc fun
 	result.interval = interval
 	result.quitchan = make(chan struct{})
 	result.slockcount = slotBlockCount
-	result.tkfunc = tkfunc
+	//result.tkfunc = tkfunc
 	result.maxTimeout = interval * time.Duration(slotBlockCount)
 	result.timeslocks = make([]*slotRecord, slotBlockCount)
 	result.ticker = time.NewTicker(interval)
@@ -83,6 +83,7 @@ func (worker *TimeWheelWorker) run() {
 				nextIndex = 0
 			}
 			atomic.StoreInt32(&worker.curindex, nextIndex)
+			var timeOutRec *slotRecord
 			worker.Lock()
 			lastrec := worker.timeslocks[curIndex]
 			if lastrec != nil {
@@ -91,7 +92,7 @@ func (worker *TimeWheelWorker) run() {
 					currec := lastrec.next
 					lastrec.curWheelIndex++
 					if lastrec.curWheelIndex >= lastrec.wheelCount { //到时间了，释放掉
-						worker.freeRecord(lastrec)
+						timeOutRec = lastrec
 					} else if firstrec == nil {
 						firstrec = lastrec //插入的时候就直接按照wheelCount大小排序了，只用增加一个个的序号就行了
 						for currec != nil {
@@ -110,8 +111,8 @@ func (worker *TimeWheelWorker) run() {
 				worker.timeslocks[curIndex] = firstrec
 			}
 			worker.Unlock()
-			if worker.tkfunc != nil {
-				worker.tkfunc()
+			if timeOutRec != nil {
+				worker.freeRecord(timeOutRec)
 			}
 		case <-worker.quitchan:
 			worker.ticker.Stop()
@@ -216,37 +217,37 @@ func (worker *TimeWheelWorker) Sleep(d time.Duration) {
 
 func After(d time.Duration) <-chan struct{} {
 	if defaultTimeWheelWorker == nil {
-		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200, nil)
+		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200)
 	}
 	return defaultTimeWheelWorker.After(d)
 }
 
 func AfterFunc(d time.Duration, afunc func()) {
 	if defaultTimeWheelWorker == nil {
-		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200, nil)
+		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200)
 	}
 	defaultTimeWheelWorker.AfterFunc(d, afunc)
 }
 
 func Sleep(d time.Duration) {
 	if defaultTimeWheelWorker == nil {
-		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200, nil)
+		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200)
 	}
 	defaultTimeWheelWorker.Sleep(d)
 }
 
-func ReSetDefaultTimeWheel(Chkinterval time.Duration, slotBlockCount int32, tickerfunc func()) {
+func ReSetDefaultTimeWheel(Chkinterval time.Duration, slotBlockCount int32) {
 	if Chkinterval < minTickerInterval {
 		Chkinterval = minTickerInterval
 	}
 	if defaultTimeWheelWorker == nil {
-		defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, tickerfunc)
+		defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount)
 		return
 	}
-	if nil != tickerfunc || defaultTimeWheelWorker.interval != Chkinterval ||
+	if defaultTimeWheelWorker.interval != Chkinterval ||
 		defaultTimeWheelWorker.slockcount != slotBlockCount {
 		defaultTimeWheelWorker.Stop()
 
-		defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount, tickerfunc)
+		defaultTimeWheelWorker = NewTimeWheelWorker(Chkinterval, slotBlockCount)
 	}
 }

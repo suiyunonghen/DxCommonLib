@@ -27,8 +27,8 @@ func TestWorker(t *testing.T) {
 
 func TestTimeWheelWorker_After(t *testing.T) {
 
-	mm := NewTimeWheelWorker(time.Millisecond*2, 6000, nil) //目前只能精确到2毫秒,低于2毫秒，就不行了
-	fmt.Println(time.Now())
+	mm := NewTimeWheelWorker(time.Millisecond*2, 6000) //目前只能精确到2毫秒,低于2毫秒，就不行了
+	start := time.Now()
 	c1 := mm.After(time.Second * 18)
 	c2 := mm.After(time.Second * 8)
 	c3 := mm.After(time.Second * 18)
@@ -39,16 +39,14 @@ func TestTimeWheelWorker_After(t *testing.T) {
 	go func() {
 		select {
 		case <-c11:
-			fmt.Println("C11触发：")
-			fmt.Println(time.Now())
+			fmt.Println("C11触发：", time.Now().Sub(start))
 		}
 	}()
 
 	go func() {
 		select {
 		case <-c12:
-			fmt.Println("C12触发：")
-			fmt.Println(time.Now())
+			fmt.Println("C12触发：", time.Now().Sub(start))
 		}
 	}()
 
@@ -56,40 +54,35 @@ func TestTimeWheelWorker_After(t *testing.T) {
 	go func() {
 		select {
 		case <-c2:
-			fmt.Println("C2触发：")
-			fmt.Println(time.Now())
+			fmt.Println("C2触发：", time.Now().Sub(start))
 		}
 	}()
 
 	go func() {
 		select {
 		case <-c4:
-			fmt.Println("C4触发：")
-			fmt.Println(time.Now())
+			fmt.Println("C4触发：", time.Now().Sub(start))
 		}
 	}()
 
 	go func() {
 		select {
 		case <-c5:
-			fmt.Println("C5触发：")
-			fmt.Println(time.Now())
+			fmt.Println("C5触发：", time.Now().Sub(start))
 		}
 	}()
 
 	go func() {
 		select {
 		case <-c3:
-			fmt.Println("C3触发：")
-			fmt.Println(time.Now())
+			fmt.Println("C3触发：", time.Now().Sub(start))
 		}
 	}()
 
 	go func() {
 		select {
 		case <-c1:
-			fmt.Println("C1触发：")
-			fmt.Println(time.Now())
+			fmt.Println("C1触发：", time.Now().Sub(start))
 		}
 	}()
 
