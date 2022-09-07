@@ -130,6 +130,9 @@ func (worker *TimeWheelWorker) getRecord(wheelcount int32) *slotRecord {
 	v := worker.recordPool.Get()
 	if v != nil {
 		result = v.(*slotRecord)
+		if result.notifychan == nil {
+			result.notifychan = make(chan struct{})
+		}
 	} else {
 		result = new(slotRecord)
 		result.notifychan = make(chan struct{})
@@ -147,8 +150,8 @@ func (worker *TimeWheelWorker) freeRecord(rec *slotRecord) {
 		rec.notifychan <- struct{}{}
 	}
 	//close(rec.notifychan)
+	//rec.notifychan = nil
 	rec.next = nil
-	rec.notifychan = nil
 	rec.wheelCount = 0
 	rec.curWheelIndex = 0
 	worker.recordPool.Put(rec)
