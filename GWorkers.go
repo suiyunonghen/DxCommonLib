@@ -19,64 +19,64 @@ type (
 
 	GWorkerFunc func(data ...interface{})
 	GWorkers    struct {
-		fMaxWorkersCount   int           //能同时存在的最多线程个数
+		mustStop           bool
+		fMaxWorkersCount   int //能同时存在的最多线程个数
+		workersCount       int
 		fMaxWorkerIdleTime time.Duration //线程能空闲的最长时间，超过这个时间了会回收掉这个线程
 		ready              []*workerChan //准备好的空闲线程
 		lock               sync.Mutex
 		workerChanPool     sync.Pool //工作者
-		deftaskrunnerPool  sync.Pool //默认任务
-		mustStop           bool
-		fstopchan          chan struct{}
-		workersCount       int
+		fStopChan          chan struct{}
 	}
 
 	workerChan struct {
 		lastUseTime time.Time
 		fOwner      *GWorkers
-		fcurTask    chan ITaskRunner
+		fCurTask    chan ITaskRunner
 	}
 
 	defTaskRunner struct {
-		runfunc GWorkerFunc
-		runargs []interface{}
+		runFunc GWorkerFunc
+		runArgs []interface{}
 	}
 )
 
-func (runner *defTaskRunner) Run() {
-	runner.runfunc(runner.runargs...)
+func (runner defTaskRunner) Run() {
+	runner.runFunc(runner.runArgs...)
 }
 
 func (workers *GWorkers) Start() {
-	if workers.fstopchan != nil {
+	if workers.fStopChan != nil {
 		panic("BUG: GWorkers already started")
 	}
-	workers.fstopchan = make(chan struct{})
-	stopCh := workers.fstopchan
+	workers.fStopChan = make(chan struct{})
+	stopCh := workers.fStopChan
 	workers.workerChanPool.New = func() interface{} {
 		return &workerChan{
 			fOwner:   workers,
-			fcurTask: make(chan ITaskRunner, workerChanCap),
+			fCurTask: make(chan ITaskRunner, workerChanCap),
 		}
 	}
 	go func() {
 		var scratch []*workerChan
 		for {
+			workers.clean(&scratch) //定时执行清理回收线程
 			select {
 			case <-stopCh:
 				return
-			case <-After(workers.fMaxWorkerIdleTime):
-				workers.clean(&scratch) //定时执行清理回收线程
+			default:
+				time.Sleep(workers.fMaxWorkerIdleTime)
 			}
 		}
 	}()
 }
 
 func (workers *GWorkers) Stop() {
-	if workers.fstopchan == nil {
+	if workers.fStopChan == nil {
 		panic("BUG: GWorkers wasn't started")
 	}
-	close(workers.fstopchan)
-	workers.fstopchan = nil
+	close(workers.fStopChan)
+	workers.fStopChan = nil
 
 	// Stop all the workers waiting for incoming connections.
 	// Do not wait for busy workers - they will stop after
@@ -85,7 +85,7 @@ func (workers *GWorkers) Stop() {
 	ready := workers.ready
 	l := len(ready)
 	for i := 0; i < l; i++ {
-		ready[i].fcurTask <- nil
+		ready[i].fCurTask <- nil
 		ready[i] = nil
 	}
 	workers.ready = ready[:0]
@@ -108,11 +108,9 @@ var workerChanCap = func() int {
 }()
 
 func (workers *GWorkers) clean(scratch *[]*workerChan) {
-	maxIdleWorkerDuration := workers.fMaxWorkerIdleTime
-
 	// Clean least recently used workers if they didn't serve connections
 	// for more than maxIdleWorkerDuration.
-	criticalTime := time.Now().Add(-maxIdleWorkerDuration)
+	criticalTime := time.Now().Add(-workers.fMaxWorkerIdleTime)
 	workers.lock.Lock()
 	ready := workers.ready
 	n := len(ready)
@@ -146,9 +144,8 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 	// may be blocking and may consume a lot of time if many workers
 	// are located on non-local CPUs.
 	tmp := *scratch
-	l = len(tmp)
-	for i := 0; i < l; i++ {
-		tmp[i].fcurTask <- nil
+	for i = 0; i < len(tmp); i++ {
+		tmp[i].fCurTask <- nil
 		tmp[i] = nil
 	}
 }
@@ -199,16 +196,13 @@ func (workers *GWorkers) release(ch *workerChan) bool {
 }
 
 func (workers *GWorkers) workerFunc(ch *workerChan) {
-	for curTask := range ch.fcurTask {
+	for {
+		curTask := <-ch.fCurTask
 		if curTask == nil {
 			break
 		}
 		curTask.Run() //执行
-		//回收curtask
-		switch runner := curTask.(type) {
-		case *defTaskRunner:
-			workers.deftaskrunnerPool.Put(runner)
-		}
+		curTask = nil
 		if !workers.release(ch) {
 			break
 		}
@@ -221,16 +215,16 @@ func (workers *GWorkers) workerFunc(ch *workerChan) {
 func (workers *GWorkers) PostFunc(routineFunc GWorkerFunc, params ...interface{}) bool {
 	wch := workers.getCh()
 	if wch != nil {
-		taskrunner := workers.deftaskrunnerPool.Get().(*defTaskRunner)
-		taskrunner.runfunc = routineFunc
-		taskrunner.runargs = params
-		wch.fcurTask <- taskrunner
+		wch.fCurTask <- defTaskRunner{
+			runFunc: routineFunc,
+			runArgs: params,
+		}
 		return true
 	}
 	return false
 }
 
-//MustRunAsync 必须异步执行到
+// MustRunAsync 必须异步执行到
 func (workers *GWorkers) MustRunAsync(routineFunc GWorkerFunc, params ...interface{}) {
 	for idx := 0; idx <= 4; idx++ {
 		if workers.PostFunc(routineFunc, params...) {
@@ -252,7 +246,7 @@ func (workers *GWorkers) TryPostAndRun(routineFunc GWorkerFunc, params ...interf
 func (workers *GWorkers) Post(runner ITaskRunner) bool {
 	wch := workers.getCh()
 	if wch != nil {
-		wch.fcurTask <- runner
+		wch.fCurTask <- runner
 		return true
 	}
 	return false
@@ -260,9 +254,6 @@ func (workers *GWorkers) Post(runner ITaskRunner) bool {
 
 func NewWorkers(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration) *GWorkers {
 	gp := new(GWorkers)
-	gp.deftaskrunnerPool.New = func() interface{} {
-		return new(defTaskRunner)
-	}
 	if maxGoroutinesAmount <= 0 {
 		gp.fMaxWorkersCount = 512 * 1024
 	} else {
@@ -300,7 +291,7 @@ func TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) bool {
 	return defWorkers.TryPostAndRun(routineFunc, params...)
 }
 
-//MustRunAsync 必须异步执行到
+// MustRunAsync 必须异步执行到
 func MustRunAsync(routineFunc GWorkerFunc, params ...interface{}) {
 	if defWorkers == nil {
 		defWorkers = NewWorkers(0, 0)
