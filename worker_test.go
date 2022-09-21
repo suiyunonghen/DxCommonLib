@@ -30,9 +30,10 @@ func TestTimeWheelWorker_After(t *testing.T) {
 	mm := NewTimeWheelWorker(time.Millisecond*2, 6000) //目前只能精确到2毫秒,低于2毫秒，就不行了
 	start := time.Now()
 	c1 := mm.After(time.Second * 18)
-	c2 := mm.After(time.Second * 8)
+	c4 := mm.After(time.Second * 2)
+	mm.Sleep(time.Millisecond * 980)
+	c2 := mm.After(time.Second * 1)
 	c3 := mm.After(time.Second * 18)
-	c4 := mm.After(time.Millisecond * 500)
 	c11 := mm.After(time.Millisecond * 500)
 	c12 := mm.After(time.Millisecond * 500)
 
@@ -54,14 +55,14 @@ func TestTimeWheelWorker_After(t *testing.T) {
 	go func() {
 		select {
 		case <-c2:
-			fmt.Println("C2触发：", time.Now().Sub(start))
+			fmt.Println("C2 1秒触发：", time.Now().Sub(start))
 		}
 	}()
 
 	go func() {
 		select {
 		case <-c4:
-			fmt.Println("C4触发：", time.Now().Sub(start))
+			fmt.Println("C4 2s后触发：", time.Now().Sub(start))
 		}
 	}()
 

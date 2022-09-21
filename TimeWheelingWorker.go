@@ -138,6 +138,7 @@ func (worker *TimeWheelWorker) getRecord(wheelcount int32) *slotRecord {
 		result.notifychan = make(chan struct{})
 	}
 	result.curWheelIndex = 0
+	result.notifyCount = 0
 	result.wheelCount = wheelcount
 	result.next = nil
 	return result
@@ -159,9 +160,9 @@ func (worker *TimeWheelWorker) freeRecord(rec *slotRecord) {
 
 func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
 	index := int32(d / worker.interval)     //触发多少次到
-	wheelcount := index / worker.slockcount //轮询多少圈
+	wheelCount := index / worker.slockcount //轮询多少圈
 	if index%worker.slockcount > 0 {
-		wheelcount++
+		wheelCount++
 	}
 	if index > 0 {
 		index--
@@ -170,38 +171,38 @@ func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
 	worker.Lock()
 	rec := worker.timeslocks[index]
 	if rec == nil {
-		rec = worker.getRecord(wheelcount)
+		rec = worker.getRecord(wheelCount)
 		worker.timeslocks[index] = rec
 	} else { //查找对应的位置
 		var last *slotRecord = nil
 		for {
-			currec := rec.next
-			if wheelcount < rec.wheelCount {
-				currec = worker.getRecord(wheelcount)
-				currec.next = rec
+			curRec := rec.next
+			if wheelCount < rec.wheelCount {
+				//在当前圈前面，时间靠前插入
+				curRec = worker.getRecord(wheelCount)
+				curRec.next = rec
 				if last == nil {
-					worker.timeslocks[index] = currec
+					worker.timeslocks[index] = curRec
 				} else {
-					last.next = currec
+					last.next = curRec
 				}
-				rec = currec
+				rec = curRec
 				break
-			} else if wheelcount == rec.wheelCount { //已经存在，直接退出
+			} else if wheelCount == rec.wheelCount { //已经存在，直接退出
 				break
-			} else if currec == nil {
-				currec = worker.getRecord(wheelcount) //链接一个新的
-				rec.next = currec
-				rec = currec
+			} else if curRec == nil {
+				curRec = worker.getRecord(wheelCount) //链接一个新的
+				rec.next = curRec
+				rec = curRec
 				break
 			}
 			last = rec
-			rec = currec
+			rec = curRec
 		}
 	}
-	atomic.AddInt32(&rec.notifyCount, 1)
-	notifychan := rec.notifychan
 	worker.Unlock()
-	return notifychan
+	atomic.AddInt32(&rec.notifyCount, 1)
+	return rec.notifychan
 }
 
 func (worker *TimeWheelWorker) AfterFunc(d time.Duration, afunc func()) {
