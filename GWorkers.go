@@ -293,6 +293,13 @@ func PostFunc(routineFunc GWorkerFunc, params ...interface{}) bool {
 	return defWorkers.PostFunc(routineFunc, params...)
 }
 
+func MustPostFunc(routineFunc GWorkerFunc, params ...interface{}) {
+	if defWorkers == nil {
+		defWorkers = NewWorkers(0, 0)
+	}
+	defWorkers.MustPostFunc(routineFunc, params...)
+}
+
 func TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) {
 	if defWorkers == nil {
 		defWorkers = NewWorkers(0, 0)

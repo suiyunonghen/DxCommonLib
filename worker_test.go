@@ -29,13 +29,19 @@ func TestTimeWheelWorker_After(t *testing.T) {
 
 	mm := NewTimeWheelWorker(time.Millisecond*2, 6000) //目前只能精确到2毫秒,低于2毫秒，就不行了
 	start := time.Now()
-	c1 := mm.After(time.Second * 18)
+	mm.AfterFunc(time.Second, func(data ...interface{}) {
+		fmt.Println("一秒之后执行，", time.Now().Sub(start).String())
+	}, start)
+	c1 := mm.After(time.Second * 8)
 	c4 := mm.After(time.Second * 2)
-	mm.Sleep(time.Millisecond * 980)
+	//mm.Sleep(time.Millisecond * 980)
 	c2 := mm.After(time.Second * 1)
 	c3 := mm.After(time.Second * 18)
 	c11 := mm.After(time.Millisecond * 500)
 	c12 := mm.After(time.Millisecond * 500)
+	mm.AfterFunc(time.Millisecond*500, func(data ...interface{}) {
+		fmt.Println("500毫秒之后执行，", time.Now().Sub(start).String())
+	}, start)
 
 	go func() {
 		select {
@@ -87,5 +93,5 @@ func TestTimeWheelWorker_After(t *testing.T) {
 		}
 	}()
 
-	<-c1
+	time.Sleep(time.Second * 10)
 }
