@@ -16,7 +16,7 @@ import (
 type (
 	//每个槽中的记录对象
 	slotRecord struct {
-		notifyCount   int32         //要通知多少个
+		//notifyCount   int32         //要通知多少个
 		wheelCount    int32         //需要轮询多少圈触发
 		curWheelIndex int32         //当前轮询的圈索引
 		notifychan    chan struct{} //通知
@@ -138,7 +138,7 @@ func (worker *TimeWheelWorker) getRecord(wheelcount int32) *slotRecord {
 		result.notifychan = make(chan struct{})
 	}
 	result.curWheelIndex = 0
-	result.notifyCount = 0
+	//result.notifyCount = 0
 	result.wheelCount = wheelcount
 	result.next = nil
 	return result
@@ -146,12 +146,12 @@ func (worker *TimeWheelWorker) getRecord(wheelcount int32) *slotRecord {
 
 func (worker *TimeWheelWorker) freeRecord(rec *slotRecord) {
 	//通知多少次
-	notifyCount := int(atomic.SwapInt32(&rec.notifyCount, 0))
+	/*notifyCount := int(atomic.SwapInt32(&rec.notifyCount, 0))
 	for i := 0; i < notifyCount; i++ {
 		rec.notifychan <- struct{}{}
-	}
-	//close(rec.notifychan)
-	//rec.notifychan = nil
+	}*/
+	close(rec.notifychan)
+	rec.notifychan = nil
 	rec.next = nil
 	rec.wheelCount = 0
 	rec.curWheelIndex = 0
@@ -201,7 +201,7 @@ func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
 		}
 	}
 	worker.Unlock()
-	atomic.AddInt32(&rec.notifyCount, 1)
+	//atomic.AddInt32(&rec.notifyCount, 1)
 	return rec.notifychan
 }
 
