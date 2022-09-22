@@ -12,11 +12,6 @@ import (
 )
 
 type (
-	//ITaskRunner 任务
-	ITaskRunner interface {
-		Run()
-	}
-
 	GWorkerFunc func(data ...interface{})
 	GWorkers    struct {
 		mustStop           bool
@@ -32,7 +27,7 @@ type (
 	workerChan struct {
 		lastUseTime time.Time
 		fOwner      *GWorkers
-		fCurTask    chan ITaskRunner
+		fCurTask    chan defTaskRunner //ITaskRunner
 	}
 
 	defTaskRunner struct {
@@ -40,10 +35,6 @@ type (
 		runArgs []interface{}
 	}
 )
-
-func (runner defTaskRunner) Run() {
-	runner.runFunc(runner.runArgs...)
-}
 
 func (workers *GWorkers) Start() {
 	if workers.fStopChan != nil {
@@ -54,7 +45,7 @@ func (workers *GWorkers) Start() {
 	workers.workerChanPool.New = func() interface{} {
 		return &workerChan{
 			fOwner:   workers,
-			fCurTask: make(chan ITaskRunner, workerChanCap),
+			fCurTask: make(chan defTaskRunner, workerChanCap),
 		}
 	}
 	go func() {
@@ -85,7 +76,7 @@ func (workers *GWorkers) Stop() {
 	ready := workers.ready
 	l := len(ready)
 	for i := 0; i < l; i++ {
-		ready[i].fCurTask <- nil
+		ready[i].fCurTask <- defTaskRunner{}
 		ready[i] = nil
 	}
 	workers.ready = ready[:0]
@@ -145,7 +136,7 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 	// are located on non-local CPUs.
 	tmp := *scratch
 	for i = 0; i < len(tmp); i++ {
-		tmp[i].fCurTask <- nil
+		tmp[i].fCurTask <- defTaskRunner{}
 		tmp[i] = nil
 	}
 }
@@ -198,11 +189,10 @@ func (workers *GWorkers) release(ch *workerChan) bool {
 func (workers *GWorkers) workerFunc(ch *workerChan) {
 	for {
 		curTask := <-ch.fCurTask
-		if curTask == nil {
+		if curTask.runFunc == nil {
 			break
 		}
-		curTask.Run() //执行
-		curTask = nil
+		curTask.runFunc(curTask.runArgs...)
 		if !workers.release(ch) {
 			break
 		}
@@ -236,19 +226,13 @@ func (workers *GWorkers) MustRunAsync(routineFunc GWorkerFunc, params ...interfa
 }
 
 func (workers *GWorkers) TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) bool {
-	if workers.PostFunc(routineFunc, params...) {
-		return true
+	for idx := 0; idx <= 4; idx++ {
+		if workers.PostFunc(routineFunc, params...) {
+			return true
+		}
+		runtime.Gosched()
 	}
 	routineFunc(params...)
-	return false
-}
-
-func (workers *GWorkers) Post(runner ITaskRunner) bool {
-	wch := workers.getCh()
-	if wch != nil {
-		wch.fCurTask <- runner
-		return true
-	}
 	return false
 }
 
@@ -297,13 +281,6 @@ func MustRunAsync(routineFunc GWorkerFunc, params ...interface{}) {
 		defWorkers = NewWorkers(0, 0)
 	}
 	defWorkers.MustRunAsync(routineFunc, params...)
-}
-
-func Post(runner ITaskRunner) {
-	if defWorkers == nil {
-		defWorkers = NewWorkers(0, 0)
-	}
-	defWorkers.Post(runner)
 }
 
 func StopWorkers() {
