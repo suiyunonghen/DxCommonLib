@@ -214,10 +214,30 @@ func (workers *GWorkers) PostFunc(routineFunc GWorkerFunc, params ...interface{}
 	return false
 }
 
+// MustPostFunc 必然投递
+func (workers *GWorkers) MustPostFunc(routineFunc GWorkerFunc, params ...interface{}) {
+	for {
+		wch := workers.getCh()
+		if wch != nil {
+			wch.fCurTask <- defTaskRunner{
+				runFunc: routineFunc,
+				runArgs: params,
+			}
+			return
+		}
+		runtime.Gosched()
+	}
+}
+
 // MustRunAsync 必须异步执行到
 func (workers *GWorkers) MustRunAsync(routineFunc GWorkerFunc, params ...interface{}) {
-	for idx := 0; idx <= 4; idx++ {
-		if workers.PostFunc(routineFunc, params...) {
+	for i := 0; i < 10; i++ {
+		wch := workers.getCh()
+		if wch != nil {
+			wch.fCurTask <- defTaskRunner{
+				runFunc: routineFunc,
+				runArgs: params,
+			}
 			return
 		}
 		runtime.Gosched()
@@ -225,15 +245,20 @@ func (workers *GWorkers) MustRunAsync(routineFunc GWorkerFunc, params ...interfa
 	go routineFunc(params...)
 }
 
-func (workers *GWorkers) TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) bool {
-	for idx := 0; idx <= 4; idx++ {
-		if workers.PostFunc(routineFunc, params...) {
-			return true
+func (workers *GWorkers) TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) {
+	for idx := 0; idx < 10; idx++ {
+		wch := workers.getCh()
+		if wch != nil {
+			wch.fCurTask <- defTaskRunner{
+				runFunc: routineFunc,
+				runArgs: params,
+			}
+			return
 		}
 		runtime.Gosched()
 	}
 	routineFunc(params...)
-	return false
+	return
 }
 
 func NewWorkers(maxGoroutinesAmount int, maxGoroutineIdleDuration time.Duration) *GWorkers {
@@ -268,11 +293,11 @@ func PostFunc(routineFunc GWorkerFunc, params ...interface{}) bool {
 	return defWorkers.PostFunc(routineFunc, params...)
 }
 
-func TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) bool {
+func TryPostAndRun(routineFunc GWorkerFunc, params ...interface{}) {
 	if defWorkers == nil {
 		defWorkers = NewWorkers(0, 0)
 	}
-	return defWorkers.TryPostAndRun(routineFunc, params...)
+	defWorkers.TryPostAndRun(routineFunc, params...)
 }
 
 // MustRunAsync 必须异步执行到
