@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	_ "go.uber.org/automaxprocs"
 )
 
 type (
@@ -51,12 +52,12 @@ func (workers *GWorkers) Start() {
 	go func() {
 		var scratch []*workerChan
 		for {
-			workers.clean(&scratch) //定时执行清理回收线程
 			select {
 			case <-stopCh:
 				return
-			default:
-				time.Sleep(workers.fMaxWorkerIdleTime)
+			case <-After(workers.fMaxWorkerIdleTime):
+				//执行上了
+				workers.clean(&scratch) //定时执行清理回收线程
 			}
 		}
 	}()
@@ -136,7 +137,10 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 	// are located on non-local CPUs.
 	tmp := *scratch
 	for i = 0; i < len(tmp); i++ {
-		tmp[i].fCurTask <- defTaskRunner{}
+		tmp[i].fCurTask <- defTaskRunner{
+			runFunc: nil,
+			runArgs: nil,
+		}
 		tmp[i] = nil
 	}
 }

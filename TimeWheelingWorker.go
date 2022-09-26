@@ -74,9 +74,16 @@ func NewTimeWheelWorker(interval time.Duration, slotBlockCount int32) *TimeWheel
 }
 
 func (worker *TimeWheelWorker) run() {
+	runAfter := func(data ...interface{}) {
+		slotTaskRunner := data[0].([]defTaskRunner)
+		for i := range slotTaskRunner{
+			slotTaskRunner[i].runFunc(slotTaskRunner[i].runArgs...)
+		}
+	}
 	for {
 		select {
 		case <-worker.ticker.C:
+			var slotTaskRunner []defTaskRunner
 			worker.Lock()
 			lastRec := worker.timeslocks[worker.curindex]
 			if lastRec != nil {
@@ -85,7 +92,34 @@ func (worker *TimeWheelWorker) run() {
 					curRec := lastRec.next
 					lastRec.curWheelIndex++
 					if lastRec.curWheelIndex >= lastRec.wheelCount { //到时间了，释放掉
-						MustRunAsync(worker.freeRecord, lastRec)
+						/*for{
+							select{
+							case <-worker.After(20):
+								//这个After就可能会被丢弃，所以实际的通知数量可能不会有设定的个数大小
+							case <-chan2:
+							default:
+							}
+						}*/
+						//通知多少次，实际的通知次数可能会比这个设定的次数小
+						notifyCount := int(atomic.SwapInt32(&lastRec.notifyCount, 0))
+						for i := 0; i < notifyCount; i++ {
+							select {
+							case lastRec.notifychan <- struct{}{}:
+								//通知成功
+							default:
+								break
+							}
+						}
+						slotTaskRunner = append(slotTaskRunner,lastRec.slotTask...)
+						for i := range lastRec.slotTask {
+							lastRec.slotTask[i].runFunc = nil
+							lastRec.slotTask[i].runArgs = nil
+						}
+						lastRec.next = nil
+						lastRec.slotTask = lastRec.slotTask[:0]
+						lastRec.wheelCount = 0
+						lastRec.curWheelIndex = 0
+						worker.recordPool.Put(lastRec)
 					} else if firstRec == nil {
 						firstRec = lastRec //插入的时候就直接按照wheelCount大小排序了，只用增加一个个的序号就行了
 						for curRec != nil {
@@ -106,6 +140,9 @@ func (worker *TimeWheelWorker) run() {
 				worker.curindex = 0
 			}
 			worker.Unlock()
+			if len(slotTaskRunner) > 0{
+				MustRunAsync(runAfter,slotTaskRunner)
+			}
 		case <-worker.quitchan:
 			worker.ticker.Stop()
 			return
@@ -132,38 +169,6 @@ func (worker *TimeWheelWorker) getRecord(wheelcount int32) *slotRecord {
 	result.wheelCount = wheelcount
 	result.next = nil
 	return result
-}
-
-func (worker *TimeWheelWorker) freeRecord(data ...interface{}) {
-	/*for{
-		select{
-		case <-worker.After(20):
-			//这个After就可能会被丢弃，所以实际的通知数量可能不会有设定的个数大小
-		case <-chan2:
-		default:
-		}
-	}*/
-	rec := data[0].(*slotRecord)
-	//通知多少次，实际的通知次数可能会比这个设定的次数小
-	notifyCount := int(atomic.SwapInt32(&rec.notifyCount, 0))
-	for i := 0; i < notifyCount; i++ {
-		select {
-		case rec.notifychan <- struct{}{}:
-			//通知成功
-		default:
-			break
-		}
-	}
-	for i := range rec.slotTask {
-		rec.slotTask[i].runFunc(rec.slotTask[i].runArgs...)
-		rec.slotTask[i].runFunc = nil
-		rec.slotTask[i].runArgs = nil
-	}
-	rec.next = nil
-	rec.slotTask = rec.slotTask[:0]
-	rec.wheelCount = 0
-	rec.curWheelIndex = 0
-	worker.recordPool.Put(rec)
 }
 
 func (worker *TimeWheelWorker) after(d time.Duration) *slotRecord {
