@@ -117,12 +117,11 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 			r = mid - 1
 		}
 	}
-	i := r
-	if i == -1 {
+	if r == -1 {
 		workers.lock.Unlock()
 		return
 	}
-
+	i := r
 	*scratch = append((*scratch)[:0], ready[:i+1]...)
 	m := copy(ready, ready[i+1:])
 	for i = m; i < n; i++ {
@@ -137,9 +136,9 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 	// are located on non-local CPUs.
 	tmp := *scratch
 	for i = 0; i < len(tmp); i++ {
-		tmp[i].fCurTask <- defTaskRunner{
-			runFunc: nil,
-			runArgs: nil,
+		select {
+		case tmp[i].fCurTask <- defTaskRunner{}:
+		default:
 		}
 		tmp[i] = nil
 	}
@@ -191,6 +190,7 @@ func (workers *GWorkers) release(ch *workerChan) bool {
 }
 
 func (workers *GWorkers) workerFunc(ch *workerChan) {
+	//waitTimes := workers.fMaxWorkerIdleTime + time.Second * 5
 	for {
 		curTask := <-ch.fCurTask
 		if curTask.runFunc == nil {
@@ -200,6 +200,34 @@ func (workers *GWorkers) workerFunc(ch *workerChan) {
 		if !workers.release(ch) {
 			break
 		}
+		/*select {
+		case curTask := <-ch.fCurTask:
+			if curTask.runFunc == nil {
+				break
+			}
+			curTask.runFunc(curTask.runArgs...)
+			if !workers.release(ch) {
+				break
+			}
+		case <-After(waitTimes):
+			//这么长时间都没有等到信号，是不是已经跪了
+			//删除这个长期占有的channel
+			workers.lock.Lock()
+			n := len(workers.ready)
+			for i := n - 1;i>=0;i--{
+				if workers.ready[i] == ch{
+					if i == n - 1{
+						workers.ready = workers.ready[:i]
+					}else{
+						workers.ready = append(workers.ready[:i],workers.ready[i+1:]...)
+					}
+					workers.workersCount--
+					break
+				}
+			}
+			workers.lock.Unlock()
+			return
+		}*/
 	}
 	workers.lock.Lock()
 	workers.workersCount--
