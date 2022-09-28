@@ -52,6 +52,7 @@ func init() {
 		<-ticker.C
 	}
 	cur := <-ticker.C
+	ticker.Stop()
 	minTickerInterval = cur.Sub(start) / time.Duration(10)
 }
 
@@ -76,7 +77,7 @@ func NewTimeWheelWorker(interval time.Duration, slotBlockCount int32) *TimeWheel
 func (worker *TimeWheelWorker) run() {
 	runAfter := func(data ...interface{}) {
 		slotTaskRunner := data[0].([]defTaskRunner)
-		for i := range slotTaskRunner{
+		for i := range slotTaskRunner {
 			slotTaskRunner[i].runFunc(slotTaskRunner[i].runArgs...)
 		}
 	}
@@ -110,7 +111,7 @@ func (worker *TimeWheelWorker) run() {
 								break
 							}
 						}
-						slotTaskRunner = append(slotTaskRunner,lastRec.slotTask...)
+						slotTaskRunner = append(slotTaskRunner, lastRec.slotTask...)
 						for i := range lastRec.slotTask {
 							lastRec.slotTask[i].runFunc = nil
 							lastRec.slotTask[i].runArgs = nil
@@ -140,8 +141,8 @@ func (worker *TimeWheelWorker) run() {
 				worker.curindex = 0
 			}
 			worker.Unlock()
-			if len(slotTaskRunner) > 0{
-				MustRunAsync(runAfter,slotTaskRunner)
+			if len(slotTaskRunner) > 0 {
+				MustRunAsync(runAfter, slotTaskRunner)
 			}
 		case <-worker.quitchan:
 			worker.ticker.Stop()

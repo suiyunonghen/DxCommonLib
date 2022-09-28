@@ -6,10 +6,10 @@ QQ:75492895
 package DxCommonLib
 
 import (
+	_ "go.uber.org/automaxprocs"
 	"runtime"
 	"sync"
 	"time"
-	_ "go.uber.org/automaxprocs"
 )
 
 type (
@@ -136,10 +136,7 @@ func (workers *GWorkers) clean(scratch *[]*workerChan) {
 	// are located on non-local CPUs.
 	tmp := *scratch
 	for i = 0; i < len(tmp); i++ {
-		select {
-		case tmp[i].fCurTask <- defTaskRunner{}:
-		default:
-		}
+		tmp[i].fCurTask <- defTaskRunner{}
 		tmp[i] = nil
 	}
 }
