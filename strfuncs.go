@@ -254,6 +254,22 @@ func Utf8String(utf8Data uintptr, utf8Len int) string {
 	return *(*string)(unsafe.Pointer(&strHead))
 }
 
+func StringFromUtf8Pointer(utf8Data uintptr,maxLen int)string  {
+	if utf8Data == 0 {
+		return ""
+	}
+	for i := 0; i < maxLen; i++ {
+		mb := (*uint16)(unsafe.Pointer(uintptr(uint(utf8Data) + uint(i))))
+		if *mb == 0 {
+			var strHead reflect.SliceHeader
+			strHead.Len = i
+			strHead.Data = utf8Data
+			return string(*(*[]byte)(unsafe.Pointer(&strHead)))
+		}
+	}
+	return ""
+}
+
 //Buffer2ByteSlice 返回值不能修改
 func Buffer2ByteSlice(Data uintptr, DataLen int) []byte {
 	var sliceHead reflect.SliceHeader
