@@ -9,14 +9,12 @@ package DxCommonLib
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 type (
 	//每个槽中的记录对象
 	slotRecord struct {
-		notifyCount   int32           //要通知多少个
 		wheelCount    int32           //需要轮询多少圈触发
 		curWheelIndex int32           //当前轮询的圈索引
 		slotTask      []defTaskRunner //能执行的任务信息
@@ -93,30 +91,14 @@ func (worker *TimeWheelWorker) run() {
 					curRec := lastRec.next
 					lastRec.curWheelIndex++
 					if lastRec.curWheelIndex >= lastRec.wheelCount { //到时间了，释放掉
-						/*for{
-							select{
-							case <-worker.After(20):
-								//这个After就可能会被丢弃，所以实际的通知数量可能不会有设定的个数大小
-							case <-chan2:
-							default:
-							}
-						}*/
-						//通知多少次，实际的通知次数可能会比这个设定的次数小
-						notifyCount := int(atomic.SwapInt32(&lastRec.notifyCount, 0))
-						for i := 0; i < notifyCount; i++ {
-							select {
-							case lastRec.notifychan <- struct{}{}:
-								//通知成功
-							default:
-								break
-							}
-						}
+						close(lastRec.notifychan)
 						slotTaskRunner = append(slotTaskRunner, lastRec.slotTask...)
 						for i := range lastRec.slotTask {
 							lastRec.slotTask[i].runFunc = nil
 							lastRec.slotTask[i].runArgs = nil
 						}
 						lastRec.next = nil
+						lastRec.notifychan = nil
 						lastRec.slotTask = lastRec.slotTask[:0]
 						lastRec.wheelCount = 0
 						lastRec.curWheelIndex = 0
@@ -162,11 +144,10 @@ func (worker *TimeWheelWorker) getRecord(wheelcount int32) *slotRecord {
 		result = v.(*slotRecord)
 	} else {
 		result = new(slotRecord)
-		result.notifychan = make(chan struct{})
 		result.slotTask = make([]defTaskRunner, 0, 8)
 	}
 	result.curWheelIndex = 0
-	result.notifyCount = 0
+	result.notifychan = make(chan struct{})
 	result.wheelCount = wheelcount
 	result.next = nil
 	return result
@@ -220,7 +201,6 @@ func (worker *TimeWheelWorker) after(d time.Duration) *slotRecord {
 
 func (worker *TimeWheelWorker) After(d time.Duration) <-chan struct{} {
 	rec := worker.after(d)
-	atomic.AddInt32(&rec.notifyCount, 1)
 	return rec.notifychan
 }
 
