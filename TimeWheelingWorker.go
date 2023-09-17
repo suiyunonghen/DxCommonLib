@@ -225,12 +225,13 @@ func After(d time.Duration) <-chan struct{} {
 	return defaultTimeWheelWorker.After(d)
 }
 
-func AfterFunc(d time.Duration, aFunc GWorkerFunc) {
+func AfterFunc(d time.Duration, aFunc GWorkerFunc,data ...interface{}) {
 	if defaultTimeWheelWorker == nil {
 		defaultTimeWheelWorker = NewTimeWheelWorker(time.Millisecond*500, 7200)
 	}
-	defaultTimeWheelWorker.AfterFunc(d, aFunc)
+	defaultTimeWheelWorker.AfterFunc(d, aFunc,data...)
 }
+
 
 func Sleep(d time.Duration) {
 	if defaultTimeWheelWorker == nil {
